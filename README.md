@@ -9,9 +9,10 @@ A simple web dashboard to view and manage your VS Code workspaces. This tool rea
 - 📊 **Sort**: Sort by name, path, type, or last modified date
 - 🔄 **Auto-Refresh**: Automatically detects new workspaces every 30 seconds
 - 🎨 **Clean UI**: Modern, responsive interface that works on all screen sizes
-- 🔒 **Secure**: Runs only on localhost (127.0.0.1) for security
+- 🔒 **Secure**: Runs only on localhost (127.0.0.1) for security (or network-accessible in Docker)
 - 🚀 **Quick Open**: Click on any workspace name to open it directly in VS Code
 - 💡 **Path Tooltips**: Hover over workspace names to see the full file path
+- 🐳 **Docker Support**: Deploy easily with Docker and docker-compose
 
 ## Supported Workspace Types
 
@@ -31,7 +32,9 @@ A simple web dashboard to view and manage your VS Code workspaces. This tool rea
 
 ## Usage
 
-### Start the Dashboard
+### Option 1: Local Development
+
+#### Start the Dashboard
 
 ```bash
 npm start
@@ -41,6 +44,52 @@ This will:
 1. Build the React frontend
 2. Start the Express server on http://localhost:3000
 3. Open your browser to view the dashboard
+
+### Option 2: Docker Deployment
+
+#### Prerequisites
+- Docker and docker-compose installed
+
+#### Quick Start
+
+1. Copy the environment configuration:
+   ```bash
+   cp .env.example .env
+   ```
+
+2. Update `.env` with your workspace path:
+   ```bash
+   # Edit .env and set WORKSPACES_PATH to your VS Code workspace storage directory
+   # Example for macOS:
+   WORKSPACES_PATH=/Users/username/Library/Application\ Support/Code/User/workspaceStorage
+   ```
+
+3. Start the application:
+   ```bash
+   docker-compose up -d
+   ```
+
+4. Access the dashboard at http://localhost:3000
+
+#### Docker Commands
+
+- **View logs**: `docker-compose logs -f`
+- **Stop the application**: `docker-compose down`
+- **Rebuild the image**: `docker-compose build --no-cache`
+- **Change port**: Set `PORT=8080` in `.env` before running `docker-compose up`
+
+#### Configuration
+
+The following environment variables can be set in `.env`:
+
+- `PORT`: Port to expose the application on (default: 3000)
+- `WORKSPACES_PATH`: Path to VS Code workspaces directory on the host (required for Docker)
+
+#### Volume Mounting
+
+The Docker container mounts your VS Code workspaces directory as read-only. This allows the dashboard to access your workspaces without modifying them.
+
+**Important**: Ensure the `WORKSPACES_PATH` in `.env` points to the correct directory on your system.
 
 ### Opening Workspaces
 
@@ -115,7 +164,16 @@ const REFRESH_INTERVAL = 30000; // 30 seconds
 
 ## Security
 
+### Local Development
 The server is configured to only listen on `127.0.0.1` (localhost) and is not accessible from external networks. This ensures your workspace data remains private and secure.
+
+### Docker Deployment
+When running in Docker, the application listens on `0.0.0.0` to accept connections from any network interface. **Important**: Only deploy Docker containers in trusted networks. Consider the following security measures:
+
+- Run docker-compose only on trusted networks
+- Use a firewall to restrict access to the container port
+- Consider adding authentication/authorization in future versions
+- The volume mount is read-only to prevent accidental modifications
 
 ## Troubleshooting
 
@@ -133,6 +191,27 @@ The server is configured to only listen on `127.0.0.1` (localhost) and is not ac
 - Ensure port 3000 is not already in use
 - Try a different port: `PORT=8080 npm start`
 - Check Node.js is installed: `node --version`
+
+### Docker issues
+
+#### Docker image build fails
+- Ensure Docker is installed and running: `docker --version`
+- Check available disk space for the image
+- Try rebuilding without cache: `docker-compose build --no-cache`
+
+#### Container won't start
+- Check the logs: `docker-compose logs`
+- Ensure the `WORKSPACES_PATH` in `.env` is correct and accessible
+- Verify the path exists on your system: `ls -la /path/to/workspaces`
+
+#### Permission denied errors
+- The container runs as the `node` user
+- Ensure the workspace directory is readable by the container
+- Try adjusting directory permissions: `chmod 755 /path/to/workspaces`
+
+#### Port already in use
+- Change the `PORT` in `.env` to an available port
+- Or stop other services using port 3000: `lsof -i :3000`
 
 ### Clicking workspace names doesn't open VS Code
 

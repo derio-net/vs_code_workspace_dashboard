@@ -1,0 +1,32 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: vscode-workspace-dashboard
+    ports:
+      - "127.0.0.1:${PORT:-3000}:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - HOST=0.0.0.0
+      - WORKSPACES_PATH=/workspaces
+    volumes:
+      - "${WORKSPACES_MOUNT_POINT:-./workspaces}:/workspaces:ro"
+    restart: unless-stopped
+    healthcheck:
+      test:
+        - CMD
+        - sh
+        - -c
+        - |
+          test -d /workspaces &&
+          test -r /workspaces &&
+          [ -n "$(ls -A /workspaces 2>/dev/null)" ] &&
+          node -e "require('http').get('http://localhost:3000', (r) => {
+            if (r.statusCode !== 200) throw new Error(r.statusCode)
+          })"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s

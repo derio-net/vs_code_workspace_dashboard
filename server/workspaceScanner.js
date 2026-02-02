@@ -5,11 +5,16 @@ const os = require('os');
 // In-memory cache for workspaces
 let workspacesCache = [];
 
-// Workspace storage path
-const WORKSPACE_STORAGE_PATH = path.join(
-  os.homedir(),
-  'Library/Application Support/Code/User/workspaceStorage'
-);
+// Workspace storage path - can be overridden via WORKSPACES_PATH environment variable
+const getWorkspaceStoragePath = () => {
+  if (process.env.WORKSPACES_PATH) {
+    return process.env.WORKSPACES_PATH;
+  }
+  return path.join(
+    os.homedir(),
+    'Library/Application Support/Code/User/workspaceStorage'
+  );
+};
 
 // Refresh interval (30 seconds)
 const REFRESH_INTERVAL = 30000;
@@ -118,6 +123,8 @@ async function scanWorkspaceDirectory(workspaceDir) {
  */
 async function scanWorkspaces() {
   try {
+    const WORKSPACE_STORAGE_PATH = getWorkspaceStoragePath();
+    
     // Check if workspace storage directory exists
     try {
       await fs.access(WORKSPACE_STORAGE_PATH);
@@ -158,6 +165,7 @@ async function refreshWorkspaces() {
  */
 async function initialize() {
   console.log('Initializing workspace scanner...');
+  const WORKSPACE_STORAGE_PATH = getWorkspaceStoragePath();
   console.log(`Workspace storage path: ${WORKSPACE_STORAGE_PATH}`);
   
   // Initial scan

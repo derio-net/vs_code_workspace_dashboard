@@ -4,7 +4,7 @@ const workspaceScanner = require('./workspaceScanner');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const HOST = '127.0.0.1'; // Localhost only
+const HOST = process.env.HOST || '127.0.0.1'; // Localhost by default, 0.0.0.0 in Docker
 
 // Middleware
 app.use(express.json());
