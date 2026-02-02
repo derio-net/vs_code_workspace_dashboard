@@ -1,0 +1,127 @@
+.workspace-table-container {
+  overflow-x: auto;
+  margin-top: 20px;
+}
+
+.workspace-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.95rem;
+}
+
+.workspace-table thead {
+  background-color: #f5f5f5;
+  border-bottom: 2px solid #e0e0e0;
+}
+
+.workspace-table th {
+  padding: 12px 16px;
+  text-align: left;
+  font-weight: 600;
+  color: #333;
+  white-space: nowrap;
+}
+
+.workspace-table th.sortable {
+  cursor: pointer;
+  user-select: none;
+  transition: background-color 0.2s;
+}
+
+.workspace-table th.sortable:hover {
+  background-color: #e8e8e8;
+}
+
+.workspace-table td {
+  padding: 12px 16px;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.workspace-table tbody tr:hover {
+  background-color: #f9f9f9;
+}
+
+.workspace-name {
+  font-weight: 500;
+  color: #1976d2;
+}
+
+.workspace-date {
+  color: #666;
+  white-space: nowrap;
+}
+
+.workspace-type {
+  white-space: nowrap;
+}
+
+.type-badge {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  text-transform: capitalize;
+}
+
+.type-local {
+  background-color: #e3f2fd;
+  color: #1976d2;
+}
+
+.type-remote {
+  background-color: #f3e5f5;
+  color: #7b1fa2;
+}
+
+.type-dev-container {
+  background-color: #e8f5e9;
+  color: #388e3c;
+}
+
+.type-attached-container {
+  background-color: #fff3e0;
+  color: #f57c00;
+}
+
+.type-ssh-remote {
+  background-color: #fce4ec;
+  color: #c2185b;
+}
+
+.type-unknown {
+  background-color: #f5f5f5;
+  color: #757575;
+}
+
+.workspace-path {
+  color: #666;
+  font-family: 'Courier New', monospace;
+  font-size: 0.9rem;
+  max-width: 400px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.no-results {
+  text-align: center;
+  padding: 40px 16px;
+  color: #999;
+  font-style: italic;
+}
+
+@media (max-width: 768px) {
+  .workspace-table {
+    font-size: 0.85rem;
+  }
+
+  .workspace-table th,
+  .workspace-table td {
+    padding: 8px 12px;
+  }
+
+  .workspace-path {
+    max-width: 200px;
+  }
+}

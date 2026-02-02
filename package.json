@@ -1,0 +1,41 @@
+{
+  "name": "vscode-workspace-dashboard",
+  "version": "1.0.0",
+  "description": "A dashboard to view and manage VS Code workspaces",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "npm run build && node server/index.js",
+    "dev": "node server/index.js",
+    "build": "react-scripts build && cp -r build/* public/",
+    "build:react": "react-scripts build",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "vscode",
+    "workspace",
+    "dashboard"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.2",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "axios": "^1.6.0"
+  },
+  "devDependencies": {
+    "react-scripts": "^5.0.1"
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  }
+}
