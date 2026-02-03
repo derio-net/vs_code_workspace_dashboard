@@ -12,11 +12,13 @@ function WorkspaceTable({ workspaces, sortConfig, onSort }) {
     const path = workspace.path;
     const type = workspace.type;
 
-    // Handle remote workspaces - preserve existing vscode-remote:// URIs
+    // Handle remote workspaces - transform vscode-remote:// to vscode://vscode-remote/
     if (type === 'remote' || type === 'dev-container' || type === 'attached-container' || type === 'ssh-remote') {
-      // If path already starts with vscode-remote://, use it as-is
+      // Transform vscode-remote:// URIs to vscode://vscode-remote/ format
+      // This is the correct format that VS Code's protocol handler recognizes
       if (path.startsWith('vscode-remote://')) {
-        return path;
+        // Replace vscode-remote:// with vscode://vscode-remote/
+        return path.replace(/^vscode-remote:\/\//, 'vscode://vscode-remote/');
       }
       // Otherwise, it might be a file:// URI that needs conversion
       // For now, return as-is and let VS Code handle it
@@ -49,14 +51,14 @@ function WorkspaceTable({ workspaces, sortConfig, onSort }) {
     const uri = convertToVSCodeURI(workspace);
     
     // For remote workspaces, we need to use a different approach
-    // since vscode-remote:// URIs don't work as href directly
-    if (workspace.type === 'remote' || workspace.type === 'dev-container' || 
+    // The vscode://vscode-remote/ URIs require special handling to open in VS Code
+    if (workspace.type === 'remote' || workspace.type === 'dev-container' ||
         workspace.type === 'attached-container' || workspace.type === 'ssh-remote') {
       // Prevent default link behavior
       e.preventDefault();
       
       // Try multiple approaches to open the remote workspace
-      // Approach 1: Try window.location.href
+      // Approach 1: Try window.location.href with the transformed vscode://vscode-remote/ URI
       window.location.href = uri;
       
       // Approach 2: If that doesn't work, try opening in a new window

@@ -74,7 +74,7 @@ The system SHALL provide a REST API endpoint that returns all discovered workspa
 - **THEN** each workspace object includes: name, path, and last modified date
 
 ### Requirement: Display dashboard UI
-The system SHALL serve a web-based dashboard that displays all workspaces in a user-friendly format.
+The system SHALL serve a web-based dashboard that displays all workspaces in a user-friendly format with correctly formatted remote workspace URIs.
 
 #### Scenario: Dashboard loads successfully
 - **WHEN** a user navigates to http://localhost:3000
@@ -83,6 +83,10 @@ The system SHALL serve a web-based dashboard that displays all workspaces in a u
 #### Scenario: Dashboard displays workspace information
 - **WHEN** the dashboard is loaded
 - **THEN** each workspace is displayed with its name, path, and last modified date in a sortable table
+
+#### Scenario: Remote workspace links use correct VS Code URI format
+- **WHEN** the dashboard displays a remote workspace (SSH, dev container, or attached container)
+- **THEN** the workspace link uses the `vscode://vscode-remote/` format instead of `vscode-remote://`
 
 ### Requirement: Search and filter workspaces
 The system SHALL allow users to search and filter workspaces by name or path.
@@ -116,4 +120,19 @@ The system SHALL periodically refresh the workspace list to detect new or remove
 #### Scenario: Dashboard reflects updated workspace list
 - **WHEN** new workspaces are added to the storage directory
 - **THEN** they appear in the dashboard after the next refresh interval
+
+### Requirement: Workspace links open in VS Code
+The system SHALL generate clickable workspace links that open the workspace in VS Code using the appropriate protocol handler.
+
+#### Scenario: Local workspace link opens in VS Code
+- **WHEN** a user clicks on a local workspace link
+- **THEN** VS Code opens the workspace at the specified file path
+
+#### Scenario: Remote workspace link opens in VS Code
+- **WHEN** a user clicks on a remote workspace link (SSH, dev container, or attached container)
+- **THEN** VS Code opens the remote workspace using the correct `vscode://vscode-remote/` protocol format
+
+#### Scenario: Remote workspace link is correctly formatted
+- **WHEN** a remote workspace is displayed in the dashboard
+- **THEN** the href attribute uses the `vscode://vscode-remote/` format that VS Code recognizes
 
