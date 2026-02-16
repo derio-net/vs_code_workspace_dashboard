@@ -1,0 +1,26 @@
+{
+  "name": "sidecar-vscode-dashboard",
+  "version": "1.0.0",
+  "description": "VS Code Workspace Dashboard Sidecar",
+  "main": "server/index.js",
+  "bin": "server/index.js",
+  "pkg": {
+    "scripts": [
+      "server/**/*.js"
+    ],
+    "assets": [
+      "public/**/*"
+    ],
+    "targets": [
+      "node18-macos-x64",
+      "node18-macos-arm64",
+      "node18-linux-x64",
+      "node18-win-x64"
+    ],
+    "outputPath": "src-tauri/binaries",
+    "compress": "GZip"
+  },
+  "dependencies": {
+    "express": "^4.18.2"
+  }
+}

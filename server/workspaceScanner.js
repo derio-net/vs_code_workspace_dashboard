@@ -5,15 +5,76 @@ const os = require('os');
 // In-memory cache for workspaces
 let workspacesCache = [];
 
-// Workspace storage path - can be overridden via WORKSPACES_PATH environment variable
+/**
+ * Get the workspace storage path based on platform
+ * Supports macOS, Windows, and Linux with XDG compliance
+ */
 const getWorkspaceStoragePath = () => {
+  // Allow override via environment variable
   if (process.env.WORKSPACES_PATH) {
-    return process.env.WORKSPACES_PATH;
+    const overridePath = path.normalize(process.env.WORKSPACES_PATH);
+    console.log(`Using WORKSPACES_PATH override: ${overridePath}`);
+    return overridePath;
   }
-  return path.join(
-    os.homedir(),
-    'Library/Application Support/Code/User/workspaceStorage'
-  );
+
+  const platform = process.platform;
+  const home = os.homedir();
+  let workspacePath;
+
+  switch (platform) {
+    case 'darwin':
+      // macOS: ~/Library/Application Support/Code/User/workspaceStorage
+      workspacePath = path.join(
+        home,
+        'Library',
+        'Application Support',
+        'Code',
+        'User',
+        'workspaceStorage'
+      );
+      break;
+
+    case 'win32':
+      // Windows: %APPDATA%\Code\User\workspaceStorage
+      // Use APPDATA env var if available, otherwise construct from home
+      const appData = process.env.APPDATA || path.join(home, 'AppData', 'Roaming');
+      workspacePath = path.join(appData, 'Code', 'User', 'workspaceStorage');
+      break;
+
+    case 'linux':
+      // Linux: ~/.config/Code/User/workspaceStorage
+      // Support XDG Base Directory specification
+      const configHome = process.env.XDG_CONFIG_HOME || path.join(home, '.config');
+      workspacePath = path.join(configHome, 'Code', 'User', 'workspaceStorage');
+      break;
+
+    case 'freebsd':
+    case 'openbsd':
+    case 'netbsd':
+      // BSD variants - use Linux path logic with warning
+      console.warn(`Platform '${platform}' is not officially supported. Using Linux path logic.`);
+      const bsdConfigHome = process.env.XDG_CONFIG_HOME || path.join(home, '.config');
+      workspacePath = path.join(bsdConfigHome, 'Code', 'User', 'workspaceStorage');
+      break;
+
+    default:
+      throw new Error(`Unsupported platform: ${platform}. Supported platforms: darwin (macOS), win32 (Windows), linux`);
+  }
+
+  // Normalize the path to handle any mixed separators
+  return path.normalize(workspacePath);
+};
+
+/**
+ * Validate that the workspace path exists
+ */
+const validateWorkspacePath = async (workspacePath) => {
+  try {
+    await fs.access(workspacePath);
+    return true;
+  } catch {
+    return false;
+  }
 };
 
 // Refresh interval (30 seconds)
@@ -165,8 +226,17 @@ async function refreshWorkspaces() {
  */
 async function initialize() {
   console.log('Initializing workspace scanner...');
+  console.log(`Detected platform: ${process.platform}`);
+  
   const WORKSPACE_STORAGE_PATH = getWorkspaceStoragePath();
   console.log(`Workspace storage path: ${WORKSPACE_STORAGE_PATH}`);
+  
+  // Validate the workspace path exists
+  const pathExists = await validateWorkspacePath(WORKSPACE_STORAGE_PATH);
+  if (!pathExists) {
+    console.warn(`Workspace storage directory not found: ${WORKSPACE_STORAGE_PATH}`);
+    console.warn('This is normal if VS Code has not been used yet or workspaces have not been created.');
+  }
   
   // Initial scan
   await refreshWorkspaces();

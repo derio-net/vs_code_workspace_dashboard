@@ -1,0 +1,2 @@
+# This directory contains sidecar binaries for the Tauri application
+# Binaries are generated during the build process using pkg

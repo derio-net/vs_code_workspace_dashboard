@@ -1,5 +1,7 @@
 import React, { useState, useRef } from 'react';
 import './WorkspaceTable.css';
+import { open } from '@tauri-apps/plugin-shell';
+import { invoke } from '@tauri-apps/api/core';
 
 const COLUMNS = [
   { key: 'name', label: 'Name' },
@@ -139,10 +141,41 @@ function WorkspaceTable({ workspaces, sortConfig, onSort }) {
     return `vscode://file${encodedPath}`;
   };
 
-  const handleWorkspaceClick = (e, workspace) => {
+  const handleWorkspaceClick = async (e, workspace) => {
     const uri = convertToVSCodeURI(workspace);
+
+    // Check if running in Tauri mode (v2 uses __TAURI_INTERNALS__ instead of __TAURI__)
+    const isTauri = typeof window !== 'undefined' && (
+      window.__TAURI__ !== undefined ||
+      window.__TAURI_INTERNALS__ !== undefined
+    );
+
+    console.log('[WorkspaceTable] Click detected:', { uri, isTauri, workspace });
+
+    if (isTauri) {
+      // In Tauri, use the shell plugin to open external URLs
+      e.preventDefault();
+      console.log('[WorkspaceTable] Opening in Tauri mode with URI:', uri);
+      try {
+        await invoke('open_vscode', { uri });
+        console.log('[WorkspaceTable] Successfully invoked open_vscode');
+      } catch (error) {
+        console.error('[WorkspaceTable] Failed to open VS Code: via invoke:', error);
+        // Fallback to shell open
+        try {
+          console.log('[WorkspaceTable] Trying fallback with shell.open...');
+          await open(uri);
+          console.log('[WorkspaceTable] Successfully opened via shell.open');
+        } catch (fallbackError) {
+          console.error('[WorkspaceTable] Fallback also failed:', fallbackError);
+        }
+      }
+      return;
+    } else {
+      console.log('[WorkspaceTable] Not in Tauri mode, using web fallback');
+    }
     
-    // For remote workspaces, we need to use a different approach
+    // For remote workspaces in web mode, we need to use a different approach
     // The vscode://vscode-remote/ URIs require special handling to open in VS Code
     if (workspace.type === 'remote' || workspace.type === 'dev-container' ||
         workspace.type === 'attached-container' || workspace.type === 'ssh-remote') {
