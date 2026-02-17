@@ -7,61 +7,44 @@ function App() {
   const [workspaces, setWorkspaces] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [apiReady, setApiReady] = useState(false);
-  const [retryCount, setRetryCount] = useState(0);
+  const [isFetching, setIsFetching] = useState(false);
 
   // Fetch workspaces from API
   const fetchWorkspaces = async () => {
+    if (isFetching) {
+      console.log('Already fetching workspaces, skipping...');
+      return;
+    }
+    
+    console.log('Starting fetchWorkspaces...');
     try {
+      setIsFetching(true);
       const data = await getWorkspaces();
+      console.log('Workspaces fetched:', data.length);
       setWorkspaces(data);
+      // Only show error if the API actually failed, not for empty results
       setError(null);
     } catch (err) {
       console.error('Error fetching workspaces:', err);
-      setError('Failed to load workspaces. Please try again.');
+      setError(`Failed to load workspaces: ${err.message || 'Unknown error'}. Please try again.`);
     } finally {
       setLoading(false);
+      setIsFetching(false);
+      console.log('fetchWorkspaces complete');
     }
   };
 
-  // Check API health and wait for it to be ready
+  // Memoize fetchWorkspaces to avoid infinite loop in Dashboard useEffect
+  const handleRefresh = React.useCallback(() => {
+    fetchWorkspaces();
+  }, []);
+
+  // Fetch workspaces on initial load
   useEffect(() => {
-    const checkApiAndFetch = async () => {
-      setLoading(true);
-      
-      // First, check if API is already available
-      const isHealthy = await checkHealth();
-      
-      if (isHealthy) {
-        setApiReady(true);
-        await fetchWorkspaces();
-      } else {
-        // Wait for API to become available (up to 30 seconds)
-        const becameReady = await waitForApi(30000, 1000);
-        
-        if (becameReady) {
-          setApiReady(true);
-          await fetchWorkspaces();
-        } else {
-          setError('Unable to connect to backend service. Please restart the application.');
-          setLoading(false);
-        }
-      }
-    };
+    fetchWorkspaces();
+  }, []);
 
-    checkApiAndFetch();
-  }, [retryCount]);
 
-  // Polling for updates (every 30 seconds)
-  useEffect(() => {
-    if (!apiReady) return;
-
-    const interval = setInterval(() => {
-      fetchWorkspaces();
-    }, 30000);
-
-    return () => clearInterval(interval);
-  }, [apiReady]);
 
   // Handle retry button click
   const handleRetry = () => {
@@ -98,7 +81,7 @@ function App() {
 
   return (
     <div className="app">
-      <Dashboard workspaces={workspaces} onRefresh={fetchWorkspaces} />
+      <Dashboard workspaces={workspaces} onRefresh={handleRefresh} />
     </div>
   );
 }

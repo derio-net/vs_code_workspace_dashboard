@@ -241,6 +241,35 @@
   color: #333;
 }
 
+/* Checkbox column styling */
+.checkbox-column {
+  width: 40px;
+  min-width: 40px;
+  max-width: 40px;
+  padding: 12px 8px !important;
+  text-align: center;
+}
+
+.checkbox-column input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  accent-color: #007acc;
+}
+
+/* Invalid workspace row styling */
+.workspace-row-invalid {
+  background-color: #ffebee !important;
+}
+
+.workspace-row-invalid:hover {
+  background-color: #ffcdd2 !important;
+}
+
+.workspace-row-invalid td {
+  border-bottom-color: #ef9a9a;
+}
+
 @media (max-width: 768px) {
   .workspace-table {
     font-size: 0.85rem;

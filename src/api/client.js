@@ -13,8 +13,12 @@ const isTauri = () => {
 };
 
 // API base URL - use environment variable if available, default to 3010
-const API_PORT = process.env.DASHBOARD_PORT || process.env.PORT || 3010;
-const API_BASE_URL = `http://localhost:${API_PORT}`;
+const API_PORT = process.env.DASHBOARD_PORT || 3010;
+const validatedPort = Number.parseInt(API_PORT, 10);
+if (Number.isNaN(validatedPort) || validatedPort < 1 || validatedPort > 65535) {
+  console.warn(`Invalid API port: ${API_PORT}, defaulting to 3010`);
+}
+const API_BASE_URL = `http://localhost:${validatedPort || 3010}`;
 
 // Maximum retry attempts
 const MAX_RETRIES = 3;
@@ -60,7 +64,18 @@ export async function apiRequest(endpoint, options = {}) {
       }
       
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        // Try to get error details from response
+        let errorMessage = `HTTP error! status: ${response.status}`;
+        try {
+          const errorData = await response.json();
+          if (errorData.error) {
+            errorMessage = errorData.error;
+          }
+        } catch {
+          // If JSON parsing fails, use the status text
+          errorMessage = response.statusText || errorMessage;
+        }
+        throw new Error(errorMessage);
       }
       
       // Check if response is JSON
@@ -95,6 +110,50 @@ export async function apiRequest(endpoint, options = {}) {
  */
 export async function getWorkspaces() {
   return apiRequest('/api/workspaces');
+}
+
+/**
+ * Validate a single workspace path
+ * @param {string} path - Path to validate
+ * @returns {Promise<{path: string, valid: boolean}>} - Validation result
+ */
+export async function validatePath(path) {
+  return apiRequest('/api/validate-path', {
+    method: 'POST',
+    body: { path }
+  });
+}
+
+/**
+ * Validate multiple workspace paths in batch
+ * @param {Array<{id: string, path: string}>} workspaces - Array of workspace objects
+ * @returns {Promise<{results: Object}>} - Map of workspace id to validation result
+ */
+export async function validatePaths(workspaces) {
+  return apiRequest('/api/validate-paths', {
+    method: 'POST',
+    body: { workspaces }
+  });
+}
+
+/**
+ * Delete workspaces from the Path
+ * @param {Array<string>} ids - Array of workspace IDs to delete
+ * @returns {Promise<{success: boolean, removed: number, message?: string, errors?: Array<string>}>}
+ */
+export async function deleteWorkspaces(ids) {
+  console.log('[API Client] deleteWorkspaces called with IDs:', ids);
+  try {
+    const result = await apiRequest('/api/workspaces/delete', {
+      method: 'POST',
+      body: { ids }
+    });
+    console.log('[API Client] deleteWorkspaces result:', result);
+    return result;
+  } catch (error) {
+    console.error('[API Client] deleteWorkspaces error:', error);
+    throw error;
+  }
 }
 
 /**
@@ -145,6 +204,9 @@ export function getEnvironment() {
 export default {
   request: apiRequest,
   getWorkspaces,
+  validatePath,
+  validatePaths,
+  deleteWorkspaces,
   checkHealth,
   waitForApi,
   getEnvironment

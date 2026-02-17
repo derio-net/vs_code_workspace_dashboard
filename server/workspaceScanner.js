@@ -1,6 +1,7 @@
 const fs = require('fs').promises;
 const path = require('path');
 const os = require('os');
+const { pathExists } = require('fs-extra');
 
 // In-memory cache for workspaces
 let workspacesCache = [];
@@ -76,6 +77,62 @@ const validateWorkspacePath = async (workspacePath) => {
     return false;
   }
 };
+
+/**
+ * Validate a single workspace path (for API)
+ * @param {string} workspacePath - Path to validate
+ * @returns {Promise<boolean>} - True if path exists
+ */
+async function validatePath(workspacePath) {
+  if (!workspacePath || typeof workspacePath !== 'string') {
+    return false;
+  }
+  
+  // Skip validation for remote URLs
+  if (workspacePath.startsWith('http://') || 
+      workspacePath.startsWith('https://') ||
+      workspacePath.startsWith('vscode://') ||
+      workspacePath.startsWith('vscode-remote://')) {
+    return true; // Consider remote paths as valid
+  }
+  
+  // Handle file:// prefix
+  let cleanPath = workspacePath;
+  if (cleanPath.startsWith('file://')) {
+    cleanPath = cleanPath.substring(7);
+  }
+  
+  // Decode URL-encoded characters
+  try {
+    cleanPath = decodeURIComponent(cleanPath);
+  } catch (e) {
+    // If decoding fails, use original path
+  }
+  
+  try {
+    return await pathExists(cleanPath);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Validate multiple workspace paths in batch
+ * @param {Array<{id: string, path: string}>} workspaces - Array of workspace objects
+ * @returns {Promise<Object>} - Map of workspace id to validation result
+ */
+async function validatePaths(workspaces) {
+  const results = {};
+  
+  for (const workspace of workspaces) {
+    if (!workspace || !workspace.id || !workspace.path) {
+      continue;
+    }
+    results[workspace.id] = await validatePath(workspace.path);
+  }
+  
+  return results;
+}
 
 // Refresh interval (30 seconds)
 const REFRESH_INTERVAL = 30000;
@@ -205,10 +262,19 @@ async function scanWorkspaces() {
     const workspaces = await Promise.all(workspacePromises);
     
     // Filter out null results (failed scans)
-    return workspaces.filter(ws => ws !== null);
+    const validWorkspaces = workspaces.filter(ws => ws !== null);
+    
+    // Log if some workspaces failed to parse
+    const failedCount = workspaces.length - validWorkspaces.length;
+    if (failedCount > 0) {
+      console.warn(`Warning: ${failedCount} workspace(s) failed to parse and were skipped`);
+    }
+    
+    return validWorkspaces;
   } catch (error) {
     console.error('Error scanning workspaces:', error);
-    return [];
+    // Re-throw the error so the API can return a proper 500 status
+    throw error;
   }
 }
 
@@ -254,8 +320,91 @@ function getWorkspaces() {
   return workspacesCache;
 }
 
+/**
+ * Remove workspaces from the OS Path environment variable
+ * @param {Array<string>} workspaceIds - Array of workspace IDs to remove
+ * @returns {Promise<{success: boolean, removed: number, errors: Array<string>}>}
+ */
+async function removeWorkspacesFromPath(workspaceIds) {
+  console.log('[WorkspaceScanner] removeWorkspacesFromPath called with IDs:', workspaceIds);
+  
+  if (!Array.isArray(workspaceIds) || workspaceIds.length === 0) {
+    console.log('[WorkspaceScanner] No workspace IDs provided');
+    return { success: false, removed: 0, errors: ['No workspace IDs provided'] };
+  }
+
+  const errors = [];
+  let removed = 0;
+
+  // Get current workspaces
+  const currentWorkspaces = getWorkspaces();
+  console.log('[WorkspaceScanner] Current workspaces count:', currentWorkspaces.length);
+  console.log('[WorkspaceScanner] Current workspace IDs:', currentWorkspaces.map(ws => ws.id));
+  
+  // Validate that all workspaces exist in the current list
+  const validIds = workspaceIds.filter(id => {
+    const exists = currentWorkspaces.some(ws => ws.id === id);
+    if (!exists) {
+      console.log(`[WorkspaceScanner] Workspace ${id} not found in current list`);
+      errors.push(`Workspace ${id} not found`);
+    }
+    return exists;
+  });
+
+  console.log('[WorkspaceScanner] Valid IDs after filtering:', validIds);
+
+  if (validIds.length === 0) {
+    console.log('[WorkspaceScanner] No valid IDs to delete');
+    return { success: false, removed: 0, errors };
+  }
+
+  // Get the workspace storage path
+  const WORKSPACE_STORAGE_PATH = getWorkspaceStoragePath();
+  console.log('[WorkspaceScanner] Workspace storage path:', WORKSPACE_STORAGE_PATH);
+
+  // Remove each workspace directory
+  for (const id of validIds) {
+    try {
+      const workspaceDir = path.join(WORKSPACE_STORAGE_PATH, id);
+      console.log(`[WorkspaceScanner] Attempting to delete: ${workspaceDir}`);
+      
+      // Check if directory exists before attempting to delete
+      const dirExists = await fs.access(workspaceDir).then(() => true).catch(() => false);
+      if (!dirExists) {
+        console.warn(`[WorkspaceScanner] Workspace directory not found: ${workspaceDir}`);
+        errors.push(`Workspace directory not found: ${workspaceDir}`);
+        continue;
+      }
+      
+      await fs.rm(workspaceDir, { recursive: true, force: true });
+      console.log(`[WorkspaceScanner] Successfully deleted: ${workspaceDir}`);
+      removed++;
+    } catch (error) {
+      console.error(`[WorkspaceScanner] Failed to delete workspace ${id}:`, error);
+      errors.push(`Failed to remove workspace ${id}: ${error.message}`);
+    }
+  }
+
+  // Refresh the cache after deletion
+  console.log('[WorkspaceScanner] Refreshing workspace cache after deletion');
+  await refreshWorkspaces();
+
+  const result = {
+    success: errors.length === 0,
+    removed,
+    errors: errors.length > 0 ? errors : undefined
+  };
+  console.log('[WorkspaceScanner] Final result:', result);
+  
+  return result;
+}
+
 module.exports = {
   initialize,
   getWorkspaces,
-  refreshWorkspaces
+  refreshWorkspaces,
+  scanWorkspaces,
+  validatePath,
+  validatePaths,
+  removeWorkspacesFromPath
 };

@@ -4,6 +4,7 @@ import { open } from '@tauri-apps/plugin-shell';
 import { invoke } from '@tauri-apps/api/core';
 
 const COLUMNS = [
+  { key: 'select', label: '' },
   { key: 'name', label: 'Name' },
   { key: 'lastModified', label: 'Last Modified' },
   { key: 'type', label: 'Type' },
@@ -12,11 +13,20 @@ const COLUMNS = [
   { key: 'path', label: 'Full Path' }
 ];
 
-function WorkspaceTable({ workspaces, sortConfig, onSort }) {
+function WorkspaceTable({ 
+  workspaces, 
+  sortConfig, 
+  onSort, 
+  validationStatus = {},
+  selectedWorkspaces = new Set(),
+  onSelectWorkspace,
+  onSelectAll
+}) {
   const [columnWidths, setColumnWidths] = useState({});
   const [isResizing, setIsResizing] = useState(false);
   const [resizeCompleted, setResizeCompleted] = useState(false);
   const [visibleColumns, setVisibleColumns] = useState({
+    select: true,
     name: true,
     lastModified: true,
     type: true,
@@ -92,13 +102,34 @@ function WorkspaceTable({ workspaces, sortConfig, onSort }) {
   const handleColumnVisibilityToggle = (columnKey) => {
     setVisibleColumns(prev => {
       const newVisible = { ...prev, [columnKey]: !prev[columnKey] };
-      // Ensure at least one column remains visible
-      const visibleCount = Object.values(newVisible).filter(Boolean).length;
+      // Ensure at least one column remains visible (excluding select column)
+      const visibleCount = Object.entries(newVisible).filter(([key, val]) => key !== 'select' && val).length;
       if (visibleCount === 0) {
         return prev; // Don't allow hiding all columns
       }
       return newVisible;
     });
+  };
+
+  // Check if all visible workspaces are selected
+  const allSelected = workspaces.length > 0 && workspaces.every(ws => selectedWorkspaces.has(ws.id));
+  const someSelected = workspaces.some(ws => selectedWorkspaces.has(ws.id)) && !allSelected;
+
+  // Handle header checkbox change
+  const handleHeaderCheckboxChange = (e) => {
+    e.stopPropagation();
+    console.log('[WorkspaceTable] Header checkbox clicked, current allSelected:', allSelected);
+    if (onSelectAll) {
+      onSelectAll(!allSelected);
+    }
+  };
+
+  // Handle row checkbox change
+  const handleRowCheckboxChange = (workspaceId, checked) => {
+    console.log('[WorkspaceTable] Row checkbox changed:', { workspaceId, checked });
+    if (onSelectWorkspace) {
+      onSelectWorkspace(workspaceId, checked);
+    }
   };
 
   // Convert workspace path to VS Code URI
@@ -309,6 +340,21 @@ function WorkspaceTable({ workspaces, sortConfig, onSort }) {
       <table className="workspace-table">
         <thead>
           <tr>
+            {visibleColumns.select && (
+              <th className="checkbox-column" onClick={(e) => e.stopPropagation()}>
+                <input
+                  type="checkbox"
+                  checked={allSelected}
+                  ref={input => {
+                    if (input) {
+                      input.indeterminate = someSelected;
+                    }
+                  }}
+                  onChange={handleHeaderCheckboxChange}
+                  title={allSelected ? 'Deselect all' : 'Select all'}
+                />
+              </th>
+            )}
             {visibleColumns.name && (
               <th
                 onClick={() => handleHeaderClick('name')}
@@ -379,21 +425,38 @@ function WorkspaceTable({ workspaces, sortConfig, onSort }) {
               </td>
             </tr>
           ) : (
-            workspaces.map((workspace) => (
-              <tr key={workspace.id}>
-                {visibleColumns.name && (
-                  <td className="workspace-name">
-                    <a
-                      href={convertToVSCodeURI(workspace)}
-                      title={workspace.path}
-                      className="workspace-link"
-                      onClick={(e) => handleWorkspaceClick(e, workspace)}
-                    >
-                      {workspace.name}
-                      <span className="external-icon" aria-label="Opens in VS Code">↗</span>
-                    </a>
-                  </td>
-                )}
+            workspaces.map((workspace) => {
+              const isValid = validationStatus[workspace.id] !== false; // undefined = not checked yet, true = valid
+              const isInvalid = validationStatus[workspace.id] === false;
+              const isSelected = selectedWorkspaces.has(workspace.id);
+              
+              return (
+                <tr 
+                  key={workspace.id} 
+                  className={isInvalid ? 'workspace-row-invalid' : ''}
+                >
+                  {visibleColumns.select && (
+                    <td className="checkbox-column" onClick={(e) => e.stopPropagation()}>
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={(e) => handleRowCheckboxChange(workspace.id, e.target.checked)}
+                      />
+                    </td>
+                  )}
+                  {visibleColumns.name && (
+                    <td className="workspace-name">
+                      <a
+                        href={convertToVSCodeURI(workspace)}
+                        title={workspace.path}
+                        className="workspace-link"
+                        onClick={(e) => handleWorkspaceClick(e, workspace)}
+                      >
+                        {workspace.name}
+                        <span className="external-icon" aria-label="Opens in VS Code">↗</span>
+                      </a>
+                    </td>
+                  )}
                 {visibleColumns.lastModified && (
                   <td className="workspace-date">{formatDate(workspace.lastModified)}</td>
                 )}
@@ -420,7 +483,8 @@ function WorkspaceTable({ workspaces, sortConfig, onSort }) {
                   </td>
                 )}
               </tr>
-            ))
+              );
+            })
           )}
         </tbody>
       </table>

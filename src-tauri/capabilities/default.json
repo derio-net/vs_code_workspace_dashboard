@@ -7,6 +7,18 @@
   ],
   "permissions": [
     "core:default",
-    "shell:allow-open"
+    "shell:allow-open",
+    {
+      "identifier": "fs:allow-read",
+      "allow": [{"path": "$WORKSPACES_MOUNT_POINT"}, {"path": "$WORKSPACES_MOUNT_POINT/**"}]
+    },
+    {
+      "identifier": "fs:allow-read-dir",
+      "allow": [{"path": "$WORKSPACES_MOUNT_POINT"}, {"path": "$WORKSPACES_MOUNT_POINT/**"}]
+    },
+    {
+      "identifier": "fs:allow-remove",
+      "allow": [{"path": "$WORKSPACES_MOUNT_POINT"}, {"path": "$WORKSPACES_MOUNT_POINT/**"}]
+    }
   ]
 }

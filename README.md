@@ -246,7 +246,7 @@ When running in Docker, the application listens on `0.0.0.0` to accept connectio
 
 ### Server won't start
 
-- Ensure port 3000 is not already in use
+- Ensure port 3010 is not already in use
 - Try a different port: `PORT=8080 npm start`
 - Check Node.js is installed: `node --version`
 
@@ -269,7 +269,7 @@ When running in Docker, the application listens on `0.0.0.0` to accept connectio
 
 #### Port already in use
 - Change the `PORT` in `.env` to an available port
-- Or stop other services using port 3000: `lsof -i :3000`
+- Or stop other services using port 3010: `lsof -i :3010`
 
 ### Clicking workspace names doesn't open VS Code
 

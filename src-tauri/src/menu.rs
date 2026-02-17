@@ -172,7 +172,7 @@ pub fn handle_menu_event(app: &tauri::AppHandle, event: tauri::menu::MenuEvent) 
         }
         "view_toggle_devtools" => {
             if let Some(window) = app.get_webview_window("main") {
-                window.open_devtools();
+                let _ = window.eval("if (window.__TAURI_DEVTOOLS__) { window.__TAURI_DEVTOOLS__.toggle() }");
             }
         }
         "help_check_updates" => {
