@@ -3,66 +3,8 @@ import WorkspaceTable from './WorkspaceTable';
 import SearchFilter from './SearchFilter';
 import { validatePaths, deleteWorkspaces } from '../api/client';
 import { ask } from '@tauri-apps/plugin-dialog';
+import { extractSSHHost, extractWorkspacePath } from '../utils/workspaceUtils';
 import './Dashboard.css';
-
-// Helper functions for extracting computed values from workspace URIs
-const extractSSHHost = (workspace) => {
-  const path = workspace.path;
-  const type = workspace.type;
-  
-  if (type === 'ssh-remote' && path.includes('ssh-remote')) {
-    // Handle URL-encoded format: vscode-remote://ssh-remote%2Bhost/path
-    const encodedMatch = path.match(/ssh-remote%2B([^/]+)/);
-    if (encodedMatch) {
-      return decodeURIComponent(encodedMatch[1]);
-    }
-    // Handle vscode://vscode-remote/ssh-remote+host@/path format
-    const match = path.match(/ssh-remote\+([^@/]+)/);
-    if (match) {
-      return match[1];
-    }
-  }
-  return '';
-};
-
-const extractWorkspacePath = (workspace) => {
-  const path = workspace.path;
-  const type = workspace.type;
-  
-  if (type === 'local') {
-    // Remove file:// prefix and decode
-    let cleanPath = path;
-    if (cleanPath.startsWith('file://')) {
-      cleanPath = cleanPath.substring(7);
-    }
-    try {
-      return decodeURIComponent(cleanPath);
-    } catch (e) {
-      return cleanPath;
-    }
-  } else if (type === 'ssh-remote') {
-    // Extract path after the host for SSH remotes
-    // Handle URL-encoded format: vscode-remote://ssh-remote%2Bhost/path
-    const encodedMatch = path.match(/ssh-remote%2B[^/]+(.+)$/);
-    if (encodedMatch) {
-      return encodedMatch[1];
-    }
-    // Handle vscode://vscode-remote/ssh-remote+host@/path format
-    const match = path.match(/ssh-remote\+[^@/]+@?(.+)$/);
-    if (match) {
-      return match[1];
-    }
-    return path;
-  } else if (type === 'dev-container' || type === 'attached-container') {
-    // For containers, try to extract the path portion
-    const match = path.match(/\+[^/]+(\/.*)$/);
-    if (match) {
-      return match[1];
-    }
-    return path;
-  }
-  return path;
-};
 
 function Dashboard({ workspaces, onRefresh }) {
   const [searchTerm, setSearchTerm] = useState('');

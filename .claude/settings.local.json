@@ -1,6 +1,12 @@
 {
   "permissions": {
     "allow": [
+      "Bash(cargo *)",
+      "Bash(npm *)",
+      "Bash(openspec *)",
+      "Bash(find *)",
+      "Bash(grep *)",
+      "Bash(ls *)",
       "Bash(npm run build)",
       "Bash(openspec new change \"frontend-redesign\")",
       "Bash(openspec status --change \"frontend-redesign\")",
@@ -9,7 +15,12 @@
       "Bash(openspec instructions specs --change \"frontend-redesign\" --json)",
       "Bash(openspec instructions tasks --change \"frontend-redesign\" --json)",
       "Bash(openspec instructions apply --change \"frontend-redesign\" --json)",
-      "Bash(cargo check)"
+      "Bash(openspec new change \"show-ssh-host-attached-containers\")",
+      "Bash(openspec status --change \"show-ssh-host-attached-containers\")",
+      "Bash(openspec instructions proposal --change \"show-ssh-host-attached-containers\")",
+      "Bash(openspec status --change \"show-ssh-host-attached-containers\" --json)",
+      "Bash(openspec instructions proposal --change \"show-ssh-host-attached-containers\" --json)",
+      "Bash(node -e \":*)"
     ]
   }
 }
