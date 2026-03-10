@@ -6,6 +6,18 @@ import { ask } from '@tauri-apps/plugin-dialog';
 import { extractSSHHost, extractWorkspacePath } from '../utils/workspaceUtils';
 import './Dashboard.css';
 
+// Emit workspaces-changed event to notify tray menu
+const emitWorkspacesChanged = async () => {
+  try {
+    if (window.__TAURI__) {
+      const { emit } = await import('@tauri-apps/api/event');
+      await emit('workspaces-changed');
+    }
+  } catch (e) {
+    // Silently ignore in non-Tauri environments
+  }
+};
+
 function Dashboard({ workspaces, onRefresh }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
@@ -210,6 +222,8 @@ function Dashboard({ workspaces, onRefresh }) {
           console.log('[Dashboard] Calling onRefresh to update workspace list');
           onRefresh();
         }
+        // Notify tray menu to update
+        emitWorkspacesChanged();
       } else {
         console.error('[Dashboard] Delete failed:', result.errors);
         setNotification({

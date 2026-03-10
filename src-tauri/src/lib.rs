@@ -1,12 +1,12 @@
 use std::sync::Arc;
 use std::time::Duration;
-use tauri::{AppHandle, Emitter, Manager, State};
+use tauri::{AppHandle, Emitter, Listener, Manager, State};
 use tokio::sync::Mutex;
 use tokio::time::interval;
 use tauri_plugin_opener::OpenerExt;
 
 mod menu;
-mod tray;
+pub mod tray;
 mod window_state;
 
 // Tauri command to open VS Code with a URI
@@ -61,7 +61,7 @@ impl SidecarState {
 }
 
 // Health check function
-async fn check_sidecar_health(port: u16) -> bool {
+pub async fn check_sidecar_health(port: u16) -> bool {
     match reqwest::get(format!("http://127.0.0.1:{}/health", port)).await {
         Ok(response) => response.status().is_success(),
         Err(_) => false,
@@ -178,6 +178,7 @@ async fn start_health_monitor(app: AppHandle, port: u16) {
 pub fn run() {
     tauri::Builder::default()
         .manage(SidecarState::new())
+        .manage(tray::TrayState::new())
         .plugin(tauri_plugin_log::Builder::default().build())
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_opener::init())
@@ -220,8 +221,44 @@ pub fn run() {
             let menu = menu::create_menu(app.app_handle());
             app.set_menu(menu)?;
 
-            // Create tray icon
-            let _ = tray::create_tray(app.app_handle());
+            // Create tray icon and store handle in TrayState synchronously
+            match tray::create_tray(app.app_handle()) {
+                Ok(tray_icon) => {
+                    let tray_state: State<tray::TrayState> = app.state();
+                    *tray_state.tray_icon.blocking_lock() = Some(tray_icon);
+                    log::info!("Tray icon created and stored in state");
+                }
+                Err(e) => {
+                    log::error!("Failed to create tray icon: {}", e);
+                }
+            }
+
+            // Start periodic tray menu refresh (every 30 seconds)
+            {
+                let app_handle = app.app_handle().clone();
+                tauri::async_runtime::spawn(async move {
+                    // Wait for sidecar to be ready before first refresh
+                    tokio::time::sleep(Duration::from_secs(4)).await;
+                    let mut interval = interval(Duration::from_secs(30));
+                    loop {
+                        interval.tick().await;
+                        tray::refresh_tray(&app_handle, port).await;
+                    }
+                });
+            }
+
+            // Listen for workspaces-changed event to trigger immediate tray refresh
+            {
+                let app_handle = app.app_handle().clone();
+                app.listen("workspaces-changed", move |_event| {
+                    let app_handle = app_handle.clone();
+                    tauri::async_runtime::spawn(async move {
+                        let state: State<SidecarState> = app_handle.state();
+                        let port = state.sidecar_port;
+                        tray::refresh_tray(&app_handle, port).await;
+                    });
+                });
+            }
 
             Ok(())
         })

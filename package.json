@@ -59,6 +59,7 @@
     ],
     "moduleNameMapper": {
       "@tauri-apps/api/core": "<rootDir>/src/__mocks__/@tauri-apps/api/core.js",
+      "@tauri-apps/api/event": "<rootDir>/src/__mocks__/@tauri-apps/api/event.js",
       "@tauri-apps/plugin-shell": "<rootDir>/src/__mocks__/@tauri-apps/plugin-shell.js",
       "@tauri-apps/plugin-dialog": "<rootDir>/src/__mocks__/@tauri-apps/plugin-dialog.js"
     }
