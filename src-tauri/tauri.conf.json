@@ -38,6 +38,9 @@
     ],
     "externalBin": [
       "binaries/sidecar-vscode-dashboard"
+    ],
+    "resources": [
+      "icons/32x32.png"
     ]
   },
   "plugins": {
