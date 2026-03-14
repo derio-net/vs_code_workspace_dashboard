@@ -4,6 +4,8 @@ package-lock.json
 
 # Production build
 build/
+public/static/
+public/asset-manifest.json
 
 # Logs
 logs

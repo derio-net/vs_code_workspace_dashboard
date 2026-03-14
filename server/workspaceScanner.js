@@ -205,7 +205,7 @@ function parseWorkspaceData(workspaceJson, workspaceDir, stats) {
       name,
       path: uri || 'Unknown',
       type,
-      lastModified: stats.mtime.toISOString(),
+      lastAccessed: stats.mtime.toISOString(),
       storageDir: workspaceDir
     };
   } catch (error) {
@@ -231,8 +231,8 @@ async function scanWorkspaceDirectory(workspaceDir) {
     
     // Read workspace.json
     const workspaceJson = await fs.readFile(workspaceJsonPath, 'utf8');
-    const stats = await fs.stat(workspaceJsonPath);
-    
+    const stats = await fs.stat(workspaceDir);
+
     return parseWorkspaceData(workspaceJson, workspaceDir, stats);
   } catch (error) {
     console.error(`Error scanning workspace directory ${workspaceDir}:`, error.message);

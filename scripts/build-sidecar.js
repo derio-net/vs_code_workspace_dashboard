@@ -23,8 +23,16 @@ if (!target) {
   process.exit(1);
 }
 
+const fs = require('fs');
+
 const ext = os.platform() === 'win32' ? '.exe' : '';
 const output = `${OUTPUT_DIR}/${SIDECAR_NAME}-${target.triple}${ext}`;
+
+// Always remove stale binary so pkg rebuilds from source
+if (fs.existsSync(output)) {
+  fs.unlinkSync(output);
+  console.log(`Removed stale binary: ${output}`);
+}
 
 console.log(`Building sidecar for ${key} -> ${output}`);
 

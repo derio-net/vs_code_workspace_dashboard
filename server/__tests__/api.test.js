@@ -166,7 +166,7 @@ describe('Spec: GET /api/workspaces returns workspace list', () => {
         name: 'My Project',
         path: '/Users/dev/my-project',
         type: 'local',
-        lastModified: '2024-01-15T10:00:00Z',
+        lastAccessed: '2024-01-15T10:00:00Z',
       },
     ];
     workspaceScanner.scanWorkspaces.mockResolvedValue(mockWorkspaces);

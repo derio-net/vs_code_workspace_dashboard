@@ -51,7 +51,7 @@ describe('App component', () => {
           name: 'Test Workspace',
           path: '/Users/dev/test',
           type: 'local',
-          lastModified: '2024-01-15T10:00:00Z',
+          lastAccessed: '2024-01-15T10:00:00Z',
         },
       ];
 

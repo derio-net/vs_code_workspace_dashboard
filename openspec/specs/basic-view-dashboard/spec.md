@@ -71,7 +71,7 @@ The system SHALL provide a REST API endpoint that returns all discovered workspa
 
 #### Scenario: API response includes required fields
 - **WHEN** a GET request is made to `/api/workspaces`
-- **THEN** each workspace object includes: name, path, and last modified date
+- **THEN** each workspace object includes: name, path, type, and lastAccessed (ISO 8601 timestamp of storage directory access time)
 
 ### Requirement: Display dashboard UI
 The system SHALL serve a web-based dashboard that displays all workspaces in a user-friendly format with resizable columns and detailed workspace attributes.
@@ -82,7 +82,7 @@ The system SHALL serve a web-based dashboard that displays all workspaces in a u
 
 #### Scenario: Dashboard displays workspace information with new columns
 - **WHEN** the dashboard is loaded
-- **THEN** each workspace is displayed with columns: Name, Last Modified, Type, SSH Host, and Path in a sortable, resizable table
+- **THEN** each workspace is displayed with columns: Name, Last Accessed, Type, Connection, and Path in a sortable, resizable table
 
 #### Scenario: Column widths are resizable
 - **WHEN** a user positions the cursor on the border between column headers
@@ -108,15 +108,19 @@ The system SHALL allow users to search and filter workspaces by name or path.
 - **THEN** the dashboard filters workspaces to show only those with matching paths
 
 ### Requirement: Sort workspace list
-The system SHALL allow users to sort the workspace list by name, path, last modified date, SSH host, or extracted workspace path.
+The system SHALL allow users to sort the workspace list by name, path, last accessed date, SSH host, or extracted workspace path. Default sort is by last-accessed descending.
+
+#### Scenario: Default sort is by last accessed date descending
+- **WHEN** the dashboard loads with no user-specified sort
+- **THEN** the workspace list SHALL be sorted by last-accessed date, newest first
 
 #### Scenario: User sorts by name
 - **WHEN** a user clicks the "Name" column header
 - **THEN** the workspace list is sorted alphabetically by name
 
-#### Scenario: User sorts by last modified date
-- **WHEN** a user clicks the "Last Modified" column header
-- **THEN** the workspace list is sorted by date (newest first or oldest first on toggle)
+#### Scenario: User sorts by last accessed date
+- **WHEN** a user clicks the "Last Accessed" column header
+- **THEN** the workspace list is sorted by last-accessed date (newest first or oldest first on toggle)
 
 #### Scenario: User sorts by SSH host
 - **WHEN** a user clicks the "SSH Host" column header

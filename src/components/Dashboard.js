@@ -21,7 +21,7 @@ const emitWorkspacesChanged = async () => {
 function Dashboard({ workspaces, onRefresh }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
-  const [sortConfig, setSortConfig] = useState({ key: 'lastModified', direction: 'desc' });
+  const [sortConfig, setSortConfig] = useState({ key: 'lastAccessed', direction: 'desc' });
   const [validationStatus, setValidationStatus] = useState({}); // Map of workspace id to isValid
   const [selectedWorkspaces, setSelectedWorkspaces] = useState(new Set());
   const [isDeleting, setIsDeleting] = useState(false);
@@ -62,7 +62,7 @@ function Dashboard({ workspaces, onRefresh }) {
       }
 
       // Handle date sorting
-      if (sortConfig.key === 'lastModified') {
+      if (sortConfig.key === 'lastAccessed') {
         aValue = new Date(aValue);
         bValue = new Date(bValue);
       } else {

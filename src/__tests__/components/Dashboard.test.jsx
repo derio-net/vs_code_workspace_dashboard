@@ -25,21 +25,21 @@ const mockWorkspaces = [
     name: 'My Project',
     path: '/Users/dev/my-project',
     type: 'local',
-    lastModified: '2024-01-15T10:00:00Z',
+    lastAccessed: '2024-01-15T10:00:00Z',
   },
   {
     id: 'ws-2',
     name: 'Remote Work',
     path: 'vscode-remote://ssh-remote%2Bmy-server/home/user/project',
     type: 'ssh-remote',
-    lastModified: '2024-01-14T09:00:00Z',
+    lastAccessed: '2024-01-14T09:00:00Z',
   },
   {
     id: 'ws-3',
     name: 'Container Dev',
     path: 'vscode-remote://dev-container%2Babc123/workspace',
     type: 'dev-container',
-    lastModified: '2024-01-13T08:00:00Z',
+    lastAccessed: '2024-01-13T08:00:00Z',
   },
 ];
 

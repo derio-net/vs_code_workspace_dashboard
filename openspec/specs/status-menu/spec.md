@@ -19,11 +19,11 @@ The system SHALL display the custom application icon as the tray/status menu ico
 - **AND** the tray SHALL still be created and functional
 
 ### Requirement: Dynamic workspace quick-access menu
-The system SHALL display recently modified workspaces in the tray context menu for quick access.
+The system SHALL display recently accessed workspaces in the tray context menu for quick access.
 
 #### Scenario: Recent workspaces are shown in the menu
 - **WHEN** the user opens the tray context menu
-- **THEN** the menu SHALL display up to 5 of the most recently modified workspaces by name
+- **THEN** the menu SHALL display up to 5 of the most recently accessed workspaces by name
 - **AND** the workspace entries SHALL appear above the standard menu items (Show Dashboard, Check for Updates, Quit)
 - **AND** a separator SHALL divide the workspace entries from the standard items
 

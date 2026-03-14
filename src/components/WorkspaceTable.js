@@ -7,7 +7,7 @@ import { extractConnectionInfo, extractWorkspacePath } from '../utils/workspaceU
 const COLUMNS = [
   { key: 'select', label: '' },
   { key: 'name', label: 'Name' },
-  { key: 'lastModified', label: 'Last Modified' },
+  { key: 'lastAccessed', label: 'Last Accessed' },
   { key: 'type', label: 'Type' },
   { key: 'connection', label: 'Connection' },
   { key: 'workspacePath', label: 'Path' },
@@ -29,7 +29,7 @@ function WorkspaceTable({
   const [visibleColumns, setVisibleColumns] = useState({
     select: true,
     name: true,
-    lastModified: true,
+    lastAccessed: true,
     type: true,
     connection: true,
     workspacePath: true,
@@ -306,14 +306,14 @@ function WorkspaceTable({
                 <div className="resize-handle" onMouseDown={(e) => handleResizeStart(e, 'name')} />
               </th>
             )}
-            {visibleColumns.lastModified && (
+            {visibleColumns.lastAccessed && (
               <th
-                onClick={() => handleHeaderClick('lastModified')}
+                onClick={() => handleHeaderClick('lastAccessed')}
                 className="sortable"
-                style={{ width: columnWidths.lastModified || 'auto' }}
+                style={{ width: columnWidths.lastAccessed || 'auto' }}
               >
-                Last Modified{getSortIndicator('lastModified')}
-                <div className="resize-handle" onMouseDown={(e) => handleResizeStart(e, 'lastModified')} />
+                Last Accessed{getSortIndicator('lastAccessed')}
+                <div className="resize-handle" onMouseDown={(e) => handleResizeStart(e, 'lastAccessed')} />
               </th>
             )}
             {visibleColumns.type && (
@@ -398,8 +398,8 @@ function WorkspaceTable({
                       </a>
                     </td>
                   )}
-                {visibleColumns.lastModified && (
-                  <td className="workspace-date">{formatDate(workspace.lastModified)}</td>
+                {visibleColumns.lastAccessed && (
+                  <td className="workspace-date">{formatDate(workspace.lastAccessed)}</td>
                 )}
                 {visibleColumns.type && (
                   <td className="workspace-type">

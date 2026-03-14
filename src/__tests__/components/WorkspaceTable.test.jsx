@@ -10,20 +10,20 @@ const mockWorkspaces = [
     name: 'My Project',
     path: '/Users/dev/my-project',
     type: 'local',
-    lastModified: '2024-01-15T10:00:00Z',
+    lastAccessed: '2024-01-15T10:00:00Z',
   },
   {
     id: 'ws-2',
     name: 'Remote Work',
     path: 'vscode-remote://ssh-remote%2Bmy-server/home/user/project',
     type: 'ssh-remote',
-    lastModified: '2024-01-14T09:00:00Z',
+    lastAccessed: '2024-01-14T09:00:00Z',
   },
 ];
 
 const defaultProps = {
   workspaces: mockWorkspaces,
-  sortConfig: { key: 'lastModified', direction: 'desc' },
+  sortConfig: { key: 'lastAccessed', direction: 'desc' },
   onSort: jest.fn(),
   validationStatus: {},
   selectedWorkspaces: new Set(),
@@ -47,10 +47,10 @@ describe('WorkspaceTable component', () => {
       render(<WorkspaceTable {...defaultProps} />);
       // Use getAllByText since headers may have child elements (resize handles)
       expect(screen.getAllByText(/^Name$/)[0]).toBeInTheDocument();
-      // Last Modified header text may be split by child elements - use role
+      // Last Accessed header text may be split by child elements - use role
       const headers = screen.getAllByRole('columnheader');
       const headerTexts = headers.map(h => h.textContent);
-      expect(headerTexts.some(t => t.includes('Last Modified'))).toBe(true);
+      expect(headerTexts.some(t => t.includes('Last Accessed'))).toBe(true);
       expect(headerTexts.some(t => t.includes('Type'))).toBe(true);
     });
 
@@ -104,18 +104,18 @@ describe('WorkspaceTable component', () => {
       expect(defaultProps.onSort).toHaveBeenCalledWith('name');
     });
 
-    it('calls onSort with lastModified when Last Modified header is clicked', async () => {
+    it('calls onSort with lastAccessed when Last Accessed header is clicked', async () => {
       const user = userEvent.setup();
       render(<WorkspaceTable {...defaultProps} />);
 
       // Find the header by role and text content (header may have child elements)
       const headers = screen.getAllByRole('columnheader');
-      const lastModifiedHeader = headers.find(h => h.textContent.includes('Last Modified'));
-      expect(lastModifiedHeader).toBeTruthy();
+      const lastAccessedHeader = headers.find(h => h.textContent.includes('Last Accessed'));
+      expect(lastAccessedHeader).toBeTruthy();
       
-      await user.click(lastModifiedHeader);
+      await user.click(lastAccessedHeader);
 
-      expect(defaultProps.onSort).toHaveBeenCalledWith('lastModified');
+      expect(defaultProps.onSort).toHaveBeenCalledWith('lastAccessed');
     });
   });
 

@@ -14,8 +14,8 @@ pub struct TrayWorkspace {
     pub path: String,
     #[serde(rename = "type", default)]
     pub workspace_type: String,
-    #[serde(rename = "lastModified")]
-    pub last_modified: String,
+    #[serde(rename = "lastAccessed")]
+    pub last_accessed: String,
 }
 
 /// Convert a workspace path to a vscode:// URI that VS Code's protocol handler recognizes.
@@ -183,7 +183,7 @@ fn build_menu(app: &tauri::AppHandle, workspaces: &[TrayWorkspace], backend_heal
             &no_ws, &sep1, &show, &updates, &sep2, &quit, &sep3, &status,
         ]).unwrap()
     } else {
-        // Build workspace items (up to 5, already sorted by last_modified desc)
+        // Build workspace items (up to 5, already sorted by last_accessed desc)
         let ws_items: Vec<MenuItem<tauri::Wry>> = workspaces.iter().take(5).map(|ws| {
             let uri = convert_to_vscode_uri(&ws.path, &ws.workspace_type);
             let menu_id = format!("ws_open:{}", uri);
@@ -239,8 +239,8 @@ pub async fn fetch_workspaces(port: u16) -> Vec<TrayWorkspace> {
             if response.status().is_success() {
                 match response.json::<Vec<TrayWorkspace>>().await {
                     Ok(mut workspaces) => {
-                        // Sort by last_modified descending
-                        workspaces.sort_by(|a, b| b.last_modified.cmp(&a.last_modified));
+                        // Sort by last_accessed descending
+                        workspaces.sort_by(|a, b| b.last_accessed.cmp(&a.last_accessed));
                         workspaces
                     }
                     Err(e) => {
@@ -328,8 +328,8 @@ mod tests {
     #[test]
     fn tray_workspace_deserializes_from_api_json() {
         let json = r#"[
-            {"name": "my-project", "path": "/home/user/my-project", "type": "local", "lastModified": "2026-03-09T10:00:00Z"},
-            {"name": "other-project", "path": "/home/user/other", "type": "ssh-remote", "lastModified": "2026-03-08T10:00:00Z"}
+            {"name": "my-project", "path": "/home/user/my-project", "type": "local", "lastAccessed": "2026-03-09T10:00:00Z"},
+            {"name": "other-project", "path": "/home/user/other", "type": "ssh-remote", "lastAccessed": "2026-03-08T10:00:00Z"}
         ]"#;
 
         let workspaces: Vec<TrayWorkspace> = serde_json::from_str(json).unwrap();
@@ -337,14 +337,14 @@ mod tests {
         assert_eq!(workspaces[0].name, "my-project");
         assert_eq!(workspaces[0].path, "/home/user/my-project");
         assert_eq!(workspaces[0].workspace_type, "local");
-        assert_eq!(workspaces[0].last_modified, "2026-03-09T10:00:00Z");
+        assert_eq!(workspaces[0].last_accessed, "2026-03-09T10:00:00Z");
         assert_eq!(workspaces[1].workspace_type, "ssh-remote");
     }
 
     #[test]
     fn tray_workspace_deserializes_with_extra_fields() {
         // The API returns more fields than TrayWorkspace needs — verify it ignores extras
-        let json = r#"{"name": "proj", "path": "/p", "lastModified": "2026-01-01T00:00:00Z", "type": "local", "id": "abc123"}"#;
+        let json = r#"{"name": "proj", "path": "/p", "lastAccessed": "2026-01-01T00:00:00Z", "type": "local", "id": "abc123"}"#;
         let ws: TrayWorkspace = serde_json::from_str(json).unwrap();
         assert_eq!(ws.name, "proj");
         assert_eq!(ws.workspace_type, "local");
@@ -352,20 +352,20 @@ mod tests {
 
     #[test]
     fn tray_workspace_type_defaults_when_missing() {
-        let json = r#"{"name": "proj", "path": "/p", "lastModified": "2026-01-01T00:00:00Z"}"#;
+        let json = r#"{"name": "proj", "path": "/p", "lastAccessed": "2026-01-01T00:00:00Z"}"#;
         let ws: TrayWorkspace = serde_json::from_str(json).unwrap();
         assert_eq!(ws.workspace_type, "");
     }
 
     #[test]
-    fn workspaces_sort_by_last_modified_descending() {
+    fn workspaces_sort_by_last_accessed_descending() {
         let mut workspaces = vec![
-            TrayWorkspace { name: "old".into(), path: "/old".into(), workspace_type: "local".into(), last_modified: "2026-01-01T00:00:00Z".into() },
-            TrayWorkspace { name: "newest".into(), path: "/new".into(), workspace_type: "local".into(), last_modified: "2026-03-09T00:00:00Z".into() },
-            TrayWorkspace { name: "mid".into(), path: "/mid".into(), workspace_type: "local".into(), last_modified: "2026-02-01T00:00:00Z".into() },
+            TrayWorkspace { name: "old".into(), path: "/old".into(), workspace_type: "local".into(), last_accessed: "2026-01-01T00:00:00Z".into() },
+            TrayWorkspace { name: "newest".into(), path: "/new".into(), workspace_type: "local".into(), last_accessed: "2026-03-09T00:00:00Z".into() },
+            TrayWorkspace { name: "mid".into(), path: "/mid".into(), workspace_type: "local".into(), last_accessed: "2026-02-01T00:00:00Z".into() },
         ];
 
-        workspaces.sort_by(|a, b| b.last_modified.cmp(&a.last_modified));
+        workspaces.sort_by(|a, b| b.last_accessed.cmp(&a.last_accessed));
 
         assert_eq!(workspaces[0].name, "newest");
         assert_eq!(workspaces[1].name, "mid");
@@ -378,7 +378,7 @@ mod tests {
             name: format!("project-{}", i),
             path: format!("/path/{}", i),
             workspace_type: "local".into(),
-            last_modified: format!("2026-03-{:02}T00:00:00Z", i + 1),
+            last_accessed: format!("2026-03-{:02}T00:00:00Z", i + 1),
         }).collect();
 
         let shown: Vec<_> = workspaces.iter().take(5).collect();
