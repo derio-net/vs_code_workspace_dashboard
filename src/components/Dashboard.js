@@ -3,7 +3,7 @@ import WorkspaceTable from './WorkspaceTable';
 import SearchFilter from './SearchFilter';
 import { validatePaths, deleteWorkspaces } from '../api/client';
 import { ask } from '@tauri-apps/plugin-dialog';
-import { extractSSHHost, extractWorkspacePath } from '../utils/workspaceUtils';
+import { extractConnectionInfo, extractWorkspacePath } from '../utils/workspaceUtils';
 import './Dashboard.css';
 
 // Emit workspaces-changed event to notify tray menu
@@ -50,9 +50,9 @@ function Dashboard({ workspaces, onRefresh }) {
       let aValue, bValue;
 
       // Handle computed columns
-      if (sortConfig.key === 'sshHost') {
-        aValue = extractSSHHost(a);
-        bValue = extractSSHHost(b);
+      if (sortConfig.key === 'connection') {
+        aValue = extractConnectionInfo(a).display;
+        bValue = extractConnectionInfo(b).display;
       } else if (sortConfig.key === 'workspacePath') {
         aValue = extractWorkspacePath(a);
         bValue = extractWorkspacePath(b);

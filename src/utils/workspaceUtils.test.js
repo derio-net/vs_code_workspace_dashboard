@@ -1,4 +1,10 @@
-import { extractSSHHost, extractWorkspacePath } from './workspaceUtils';
+import {
+  decodeHexHost,
+  formatConnectionInfo,
+  extractConnectionInfo,
+  extractSSHHost,
+  extractWorkspacePath,
+} from './workspaceUtils';
 
 // Sample URIs matching real VS Code workspace storage formats
 const REMOTE_ATTACHED_CONTAINER_URI =
@@ -15,16 +21,145 @@ const SSH_REMOTE_PLUS_URI =
 
 const LOCAL_URI = 'file:///Users/dev/my%20project';
 
-describe('extractSSHHost', () => {
-  // Spec: Requirement "SSH host extraction from remotely-attached container URIs"
+// Helper: hex-encode a string
+function toHex(str) {
+  let hex = '';
+  for (let i = 0; i < str.length; i++) {
+    hex += str.charCodeAt(i).toString(16).padStart(2, '0');
+  }
+  return hex;
+}
+
+describe('decodeHexHost', () => {
+  it('decodes valid hex-encoded JSON with hostName only', () => {
+    const hex = toHex('{"hostName":"my-server"}');
+    expect(decodeHexHost(hex)).toEqual({ hostName: 'my-server' });
+  });
+
+  it('decodes hex JSON with hostName and user', () => {
+    const hex = toHex('{"hostName":"build-server-01","user":"root"}');
+    expect(decodeHexHost(hex)).toEqual({ hostName: 'build-server-01', user: 'root' });
+  });
+
+  it('decodes hex JSON with hostName, user, and port', () => {
+    const hex = toHex('{"hostName":"server","user":"admin","port":2222}');
+    expect(decodeHexHost(hex)).toEqual({ hostName: 'server', user: 'admin', port: 2222 });
+  });
+
+  it('decodes hex JSON with hostName and port only', () => {
+    const hex = toHex('{"hostName":"server","port":22}');
+    expect(decodeHexHost(hex)).toEqual({ hostName: 'server', port: 22 });
+  });
+
+  it('throws on invalid hex characters', () => {
+    expect(() => decodeHexHost('ZZZZ')).toThrow();
+  });
+
+  it('throws on incomplete hex string (odd length)', () => {
+    const hex = toHex('{"hostName":"x"}');
+    expect(() => decodeHexHost(hex.slice(0, -1))).toThrow();
+  });
+
+  it('throws on valid hex that is not JSON', () => {
+    const hex = toHex('not json at all');
+    expect(() => decodeHexHost(hex)).toThrow();
+  });
+
+  it('throws on JSON without hostName field', () => {
+    const hex = toHex('{"user":"root"}');
+    expect(() => decodeHexHost(hex)).toThrow(/hostName/);
+  });
+});
+
+describe('formatConnectionInfo', () => {
+  it('formats hostName only', () => {
+    expect(formatConnectionInfo({ hostName: 'my-server' })).toBe('my-server');
+  });
+
+  it('formats hostName + user', () => {
+    expect(formatConnectionInfo({ hostName: 'build-server-01', user: 'root' })).toBe('root@build-server-01');
+  });
+
+  it('formats hostName + user + port', () => {
+    expect(formatConnectionInfo({ hostName: 'server', user: 'admin', port: 2222 })).toBe('admin@server:2222');
+  });
+
+  it('formats hostName + port (no user)', () => {
+    expect(formatConnectionInfo({ hostName: 'server', port: 22 })).toBe('server:22');
+  });
+});
+
+describe('extractConnectionInfo', () => {
+  it('decodes hex-encoded JSON host from ssh-remote URI', () => {
+    const hex = toHex('{"hostName":"build-server-01","user":"root"}');
+    const ws = { type: 'ssh-remote', path: `vscode-remote://ssh-remote%2B${hex}/opt/bo` };
+    const result = extractConnectionInfo(ws);
+    expect(result.display).toBe('root@build-server-01');
+    expect(result.raw).toBe(hex);
+    expect(result.error).toBeUndefined();
+  });
+
+  it('returns plain hostname for old-format ssh-remote URI', () => {
+    const ws = { type: 'ssh-remote', path: SSH_REMOTE_URI };
+    const result = extractConnectionInfo(ws);
+    expect(result.display).toBe('my-server');
+    expect(result.raw).toBeUndefined();
+  });
+
+  it('returns plain hostname from + literal URI', () => {
+    const ws = { type: 'ssh-remote', path: SSH_REMOTE_PLUS_URI };
+    expect(extractConnectionInfo(ws).display).toBe('my-server');
+  });
+
+  it('returns error on decode failure', () => {
+    // 7b22 prefix but invalid JSON after that
+    const badHex = '7b2200000000';
+    const ws = { type: 'ssh-remote', path: `vscode-remote://ssh-remote%2B${badHex}/path` };
+    const result = extractConnectionInfo(ws);
+    expect(result.display).toBe('\u26a0 decode error');
+    expect(result.error).toBe(true);
+    expect(result.raw).toBe(badHex);
+  });
+
+  it('decodes hex host from attached-container on remote SSH host', () => {
+    const hex = toHex('{"hostName":"remote-box","user":"deploy"}');
+    const ws = {
+      type: 'attached-container',
+      path: `vscode-remote://attached-container%2Babc@ssh-remote%2B${hex}/opt/app`,
+    };
+    const result = extractConnectionInfo(ws);
+    expect(result.display).toBe('deploy@remote-box');
+  });
+
+  it('returns plain hostname from attached-container on remote SSH host', () => {
+    const ws = { type: 'attached-container', path: REMOTE_ATTACHED_CONTAINER_URI };
+    expect(extractConnectionInfo(ws).display).toBe('dev-server-01');
+  });
+
+  it('returns empty display for local workspace', () => {
+    const ws = { type: 'local', path: LOCAL_URI };
+    expect(extractConnectionInfo(ws).display).toBe('');
+  });
+
+  it('returns empty display for attached container without SSH remote', () => {
+    const ws = { type: 'attached-container', path: LOCAL_ATTACHED_CONTAINER_URI };
+    expect(extractConnectionInfo(ws).display).toBe('');
+  });
+});
+
+describe('extractSSHHost (deprecated alias)', () => {
+  it('returns display string from extractConnectionInfo', () => {
+    const ws = { type: 'ssh-remote', path: SSH_REMOTE_URI };
+    expect(extractSSHHost(ws)).toBe('my-server');
+  });
 
   it('extracts SSH host from attached container on remote SSH host', () => {
     const ws = { type: 'attached-container', path: REMOTE_ATTACHED_CONTAINER_URI };
     expect(extractSSHHost(ws)).toBe('dev-server-01');
   });
 
-  it('returns empty string for attached container without SSH remote', () => {
-    const ws = { type: 'attached-container', path: LOCAL_ATTACHED_CONTAINER_URI };
+  it('returns empty string for local workspaces', () => {
+    const ws = { type: 'local', path: LOCAL_URI };
     expect(extractSSHHost(ws)).toBe('');
   });
 
@@ -34,22 +169,6 @@ describe('extractSSHHost', () => {
       path: 'vscode-remote://attached-container%2Babc@ssh-remote%2Bhost%2Ewith%2Edots/path',
     };
     expect(extractSSHHost(ws)).toBe('host.with.dots');
-  });
-
-  // Regression: existing ssh-remote type still works
-  it('extracts host from plain ssh-remote URI (%2B encoded)', () => {
-    const ws = { type: 'ssh-remote', path: SSH_REMOTE_URI };
-    expect(extractSSHHost(ws)).toBe('my-server');
-  });
-
-  it('extracts host from ssh-remote URI (+ literal)', () => {
-    const ws = { type: 'ssh-remote', path: SSH_REMOTE_PLUS_URI };
-    expect(extractSSHHost(ws)).toBe('my-server');
-  });
-
-  it('returns empty string for local workspaces', () => {
-    const ws = { type: 'local', path: LOCAL_URI };
-    expect(extractSSHHost(ws)).toBe('');
   });
 });
 
@@ -81,17 +200,16 @@ describe('extractWorkspacePath', () => {
 describe('sorting compatibility', () => {
   // Spec: Requirement "Sorting by SSH host includes remotely-attached containers"
 
-  it('both ssh-remote and remote attached-container return non-empty host for sorting', () => {
+  it('both ssh-remote and remote attached-container return non-empty display for sorting', () => {
     const attached = { type: 'attached-container', path: REMOTE_ATTACHED_CONTAINER_URI };
     const ssh = { type: 'ssh-remote', path: SSH_REMOTE_URI };
 
-    const hostA = extractSSHHost(attached);
-    const hostB = extractSSHHost(ssh);
+    const displayA = extractConnectionInfo(attached).display;
+    const displayB = extractConnectionInfo(ssh).display;
 
-    expect(hostA).toBeTruthy();
-    expect(hostB).toBeTruthy();
-    // String comparison works for sorting
-    expect(typeof hostA).toBe('string');
-    expect(typeof hostB).toBe('string');
+    expect(displayA).toBeTruthy();
+    expect(displayB).toBeTruthy();
+    expect(typeof displayA).toBe('string');
+    expect(typeof displayB).toBe('string');
   });
 });

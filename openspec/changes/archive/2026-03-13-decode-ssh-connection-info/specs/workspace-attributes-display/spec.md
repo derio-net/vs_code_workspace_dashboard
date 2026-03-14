@@ -1,11 +1,7 @@
-# workspace-attributes-display Specification
+## MODIFIED Requirements
 
-## Purpose
-Defines how workspace attributes (connection info, paths) are extracted from VS Code workspace URIs and displayed in the dashboard table columns.
-
-## Requirements
-### Requirement: Display connection info for remote workspaces
-The system SHALL extract and display connection information for SSH remote workspaces in a dedicated "CONNECTION" column. When the host identifier is a hex-encoded JSON blob, the system SHALL decode it and present structured connection details in `user@host:port` format, omitting absent fields.
+### Requirement: Display SSH Host for remote workspaces
+The system SHALL extract and display connection information for SSH remote workspaces in a dedicated "CONNECTION" column (renamed from "SSH Host"). When the host identifier is a hex-encoded JSON blob, the system SHALL decode it and present structured connection details in `user@host:port` format, omitting absent fields.
 
 #### Scenario: Plain hostname is displayed in CONNECTION column
 - **WHEN** a workspace is of type `ssh-remote` with a plain hostname in the URI (e.g., `ssh-remote%2Braspi-clawdia-lab`)
@@ -62,10 +58,16 @@ The system SHALL display the workspace path in a dedicated "Path" column, with c
 ### Requirement: Handle missing or malformed attributes gracefully
 The system SHALL display empty values for attributes that cannot be extracted or are not applicable to the workspace type.
 
-#### Scenario: Missing connection info shows empty cell
+#### Scenario: Missing SSH host shows empty cell
 - **WHEN** a workspace URI is malformed or missing SSH host information
 - **THEN** the CONNECTION column SHALL display an empty string
 
 #### Scenario: Missing path shows empty cell
 - **WHEN** a workspace URI is malformed or missing path information
 - **THEN** the Path column displays an empty string
+
+## RENAMED Requirements
+
+### Requirement: Display SSH Host for remote workspaces
+- **FROM:** SSH Host
+- **TO:** CONNECTION

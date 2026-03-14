@@ -1,11 +1,81 @@
 /**
- * Extract SSH host from a workspace URI.
+ * Decode a hex-encoded JSON host string from VS Code's newer SSH remote URIs.
  *
- * Handles:
- * - ssh-remote workspaces: vscode-remote://ssh-remote%2B<host>/path
- * - attached containers on remote SSH hosts: ...@ssh-remote%2B<host>/path
+ * @param {string} hexString - Hex-encoded JSON (e.g., "7b22686f73744e616d65223a22...7d")
+ * @returns {{ hostName: string, user?: string, port?: number }}
+ * @throws {Error} If hex decoding or JSON parsing fails
  */
-export function extractSSHHost(workspace) {
+export function decodeHexHost(hexString) {
+  let decoded = '';
+  for (let i = 0; i < hexString.length; i += 2) {
+    const byte = parseInt(hexString.substring(i, i + 2), 16);
+    if (isNaN(byte)) {
+      throw new Error('Invalid hex character at position ' + i);
+    }
+    decoded += String.fromCharCode(byte);
+  }
+  const parsed = JSON.parse(decoded);
+  if (!parsed.hostName || typeof parsed.hostName !== 'string') {
+    throw new Error('Missing or invalid hostName in decoded JSON');
+  }
+  return {
+    hostName: parsed.hostName,
+    ...(parsed.user && { user: parsed.user }),
+    ...(parsed.port !== undefined && { port: parsed.port }),
+  };
+}
+
+/**
+ * Format connection info into a human-readable string.
+ *
+ * @param {{ hostName: string, user?: string, port?: number }} info
+ * @returns {string} Formatted as "user@host:port" with absent parts omitted
+ */
+export function formatConnectionInfo({ hostName, user, port }) {
+  let result = '';
+  if (user) {
+    result += user + '@';
+  }
+  result += hostName;
+  if (port !== undefined) {
+    result += ':' + port;
+  }
+  return result;
+}
+
+/**
+ * Extract connection info from a workspace URI.
+ *
+ * Returns an object with display string, optional error flag, and raw value.
+ * Handles both plain hostnames and hex-encoded JSON host blobs.
+ *
+ * @param {object} workspace - Workspace object with path and type
+ * @returns {{ display: string, error?: boolean, raw?: string }}
+ */
+export function extractConnectionInfo(workspace) {
+  const rawHost = _extractRawHost(workspace);
+  if (!rawHost) {
+    return { display: '' };
+  }
+
+  // Detect hex-encoded JSON: always starts with 7b22 (hex for '{"')
+  if (rawHost.startsWith('7b22')) {
+    try {
+      const info = decodeHexHost(rawHost);
+      return { display: formatConnectionInfo(info), raw: rawHost };
+    } catch {
+      return { display: '\u26a0 decode error', error: true, raw: rawHost };
+    }
+  }
+
+  return { display: rawHost };
+}
+
+/**
+ * Extract raw host string from workspace URI (before hex decoding).
+ * @private
+ */
+function _extractRawHost(workspace) {
   const path = workspace.path;
   const type = workspace.type;
 
@@ -28,6 +98,13 @@ export function extractSSHHost(workspace) {
     }
   }
   return '';
+}
+
+/**
+ * @deprecated Use extractConnectionInfo() instead. This returns only the display string.
+ */
+export function extractSSHHost(workspace) {
+  return extractConnectionInfo(workspace).display;
 }
 
 /**

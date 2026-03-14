@@ -2,14 +2,14 @@ import React, { useState, useRef } from 'react';
 import './WorkspaceTable.css';
 import { open } from '@tauri-apps/plugin-shell';
 import { invoke } from '@tauri-apps/api/core';
-import { extractSSHHost, extractWorkspacePath } from '../utils/workspaceUtils';
+import { extractConnectionInfo, extractWorkspacePath } from '../utils/workspaceUtils';
 
 const COLUMNS = [
   { key: 'select', label: '' },
   { key: 'name', label: 'Name' },
   { key: 'lastModified', label: 'Last Modified' },
   { key: 'type', label: 'Type' },
-  { key: 'sshHost', label: 'SSH Host' },
+  { key: 'connection', label: 'Connection' },
   { key: 'workspacePath', label: 'Path' },
   { key: 'path', label: 'Full Path' }
 ];
@@ -31,7 +31,7 @@ function WorkspaceTable({
     name: true,
     lastModified: true,
     type: true,
-    sshHost: true,
+    connection: true,
     workspacePath: true,
     path: false // Hidden by default as it's verbose
   });
@@ -326,14 +326,14 @@ function WorkspaceTable({
                 <div className="resize-handle" onMouseDown={(e) => handleResizeStart(e, 'type')} />
               </th>
             )}
-            {visibleColumns.sshHost && (
+            {visibleColumns.connection && (
               <th
-                onClick={() => handleHeaderClick('sshHost')}
+                onClick={() => handleHeaderClick('connection')}
                 className="sortable"
-                style={{ width: columnWidths.sshHost || 'auto' }}
+                style={{ width: columnWidths.connection || 'auto' }}
               >
-                SSH Host{getSortIndicator('sshHost')}
-                <div className="resize-handle" onMouseDown={(e) => handleResizeStart(e, 'sshHost')} />
+                Connection{getSortIndicator('connection')}
+                <div className="resize-handle" onMouseDown={(e) => handleResizeStart(e, 'connection')} />
               </th>
             )}
             {visibleColumns.workspacePath && (
@@ -408,10 +408,18 @@ function WorkspaceTable({
                     </span>
                   </td>
                 )}
-                {visibleColumns.sshHost && (
-                  <td className="workspace-ssh-host" title={extractSSHHost(workspace)}>
-                    {extractSSHHost(workspace)}
-                  </td>
+                {visibleColumns.connection && (
+                  (() => {
+                    const connInfo = extractConnectionInfo(workspace);
+                    return (
+                      <td
+                        className={`workspace-connection${connInfo.error ? ' workspace-connection-error' : ''}`}
+                        title={connInfo.raw || connInfo.display}
+                      >
+                        {connInfo.display}
+                      </td>
+                    );
+                  })()
                 )}
                 {visibleColumns.workspacePath && (
                   <td className="workspace-extracted-path" title={extractWorkspacePath(workspace)}>

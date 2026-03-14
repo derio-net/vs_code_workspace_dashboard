@@ -21,7 +21,7 @@
       "Bash(openspec status --change \"show-ssh-host-attached-containers\" --json)",
       "Bash(openspec instructions proposal --change \"show-ssh-host-attached-containers\" --json)",
       "Bash(node -e \":*)",
-      "Bash(git -C /Users/user/Docs/projects/SIDE_PROJECTS/vs_code_workspace_dashboard log --diff-filter=A --name-only --pretty=format: -- public/index.html)"
+      "WebFetch(domain:aider.chat)"
     ]
   }
 }

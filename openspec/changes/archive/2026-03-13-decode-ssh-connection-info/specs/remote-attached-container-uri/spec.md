@@ -1,3 +1,5 @@
+## MODIFIED Requirements
+
 ### Requirement: SSH host extraction from remotely-attached container URIs
 The system SHALL extract the SSH host name from attached-container workspace URIs that include an `@ssh-remote%2B<host>` authority segment. When the host segment is a hex-encoded JSON blob, the system SHALL decode it and extract structured connection information.
 
@@ -20,21 +22,3 @@ The system SHALL extract the SSH host name from attached-container workspace URI
 #### Scenario: Hex decode failure on attached container host
 - **WHEN** the host segment in an attached-container URI starts with `7b22` but cannot be decoded
 - **THEN** the CONNECTION column SHALL display an error indicator with the raw value in tooltip
-
-### Requirement: Clean path extraction from remotely-attached container URIs
-The system SHALL extract the filesystem path from attached-container URIs that use the `@ssh-remote%2B<host>/<path>` format.
-
-#### Scenario: Path after SSH host authority
-- **WHEN** a workspace has path `vscode-remote://attached-container%2B<json>@ssh-remote%2B<host>/<path>`
-- **THEN** the Path column SHALL display `/<path>` (e.g., `/opt/bo`)
-
-#### Scenario: Local attached container path extraction unchanged
-- **WHEN** a workspace has type `attached-container` and its path does NOT contain `@ssh-remote%2B`
-- **THEN** the path extraction SHALL continue using the existing `+<hex>/<path>` pattern
-
-### Requirement: Sorting by SSH host includes remotely-attached containers
-The system SHALL include remotely-attached container SSH hosts when sorting by the CONNECTION column.
-
-#### Scenario: Sort by CONNECTION groups remote containers with SSH remotes
-- **WHEN** the user sorts by the CONNECTION column
-- **THEN** remotely-attached containers SHALL sort alongside SSH Remote workspaces by their extracted host name

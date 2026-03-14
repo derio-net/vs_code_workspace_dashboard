@@ -81,9 +81,9 @@ describe('WorkspaceTable component', () => {
       expect(document.body).toBeInTheDocument();
     });
 
-    it('SSH Host column is visible by default', () => {
+    it('Connection column is visible by default', () => {
       render(<WorkspaceTable {...defaultProps} />);
-      expect(screen.getByText('SSH Host')).toBeInTheDocument();
+      expect(screen.getByText('Connection')).toBeInTheDocument();
     });
 
     it('Full Path column is hidden by default', () => {

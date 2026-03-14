@@ -8,6 +8,8 @@
 
 A simple web dashboard to view and manage your VS Code workspaces. This tool reads workspace metadata from VS Code's storage directory and presents it in an easy-to-use interface.
 
+![VS Code Workspace Dashboard Screenshot](screenshot.jpeg)
+
 ## Features
 
 - 📁 **View All Workspaces**: See all your VS Code workspaces in one place

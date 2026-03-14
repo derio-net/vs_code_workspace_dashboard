@@ -186,7 +186,7 @@
 
 /* ── Path columns ── */
 .workspace-path,
-.workspace-ssh-host,
+.workspace-connection,
 .workspace-extracted-path {
   color: var(--text-secondary);
   font-family: var(--font-mono);
@@ -200,8 +200,13 @@
   max-width: 400px;
 }
 
-.workspace-ssh-host {
+.workspace-connection {
   max-width: 200px;
+}
+
+.workspace-connection-error {
+  color: var(--text-muted);
+  font-style: italic;
 }
 
 .workspace-extracted-path {
