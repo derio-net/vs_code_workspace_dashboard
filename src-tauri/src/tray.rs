@@ -4,12 +4,14 @@ use tauri::Emitter;
 use tauri::Manager;
 use tauri_plugin_opener::OpenerExt;
 use serde::Deserialize;
+use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
 /// Workspace info fetched from the sidecar API
 #[derive(Debug, Clone, Deserialize)]
 pub struct TrayWorkspace {
+    pub id: String,
     pub name: String,
     pub path: String,
     #[serde(rename = "type", default)]
@@ -89,7 +91,7 @@ fn resolve_icon_path(app: &tauri::AppHandle) -> Option<std::path::PathBuf> {
 
 /// Create the initial tray icon with custom app icon and default menu
 pub fn create_tray(app: &tauri::AppHandle) -> tauri::Result<TrayIcon> {
-    let tray_menu = build_menu(app, &[], false);
+    let tray_menu = build_menu(app, &[], false, &HashMap::new());
 
     let mut builder = TrayIconBuilder::with_id("main-tray")
         .menu(&tray_menu)
@@ -165,8 +167,25 @@ fn handle_tray_menu_event(app: &tauri::AppHandle, event: tauri::menu::MenuEvent)
     }
 }
 
+/// Map workspace type to a colored emoji indicator
+fn type_emoji(workspace_type: &str) -> &'static str {
+    match workspace_type {
+        "local" => "🔵",
+        "ssh-remote" => "🟣",
+        "dev-container" => "🟢",
+        "attached-container" => "🟡",
+        "remote" => "🩷",
+        _ => "⚪",
+    }
+}
+
+/// Check if a workspace type is remote (cannot validate path locally)
+fn is_remote_type(workspace_type: &str) -> bool {
+    matches!(workspace_type, "remote" | "dev-container" | "attached-container" | "ssh-remote")
+}
+
 /// Build the tray menu with workspace entries and health status
-fn build_menu(app: &tauri::AppHandle, workspaces: &[TrayWorkspace], backend_healthy: bool) -> Menu<tauri::Wry> {
+fn build_menu(app: &tauri::AppHandle, workspaces: &[TrayWorkspace], backend_healthy: bool, validity: &HashMap<String, bool>) -> Menu<tauri::Wry> {
     let status_label = if backend_healthy { "Backend: Running" } else { "Backend: Offline" };
 
     if workspaces.is_empty() {
@@ -183,11 +202,19 @@ fn build_menu(app: &tauri::AppHandle, workspaces: &[TrayWorkspace], backend_heal
             &no_ws, &sep1, &show, &updates, &sep2, &quit, &sep3, &status,
         ]).unwrap()
     } else {
-        // Build workspace items (up to 5, already sorted by last_accessed desc)
-        let ws_items: Vec<MenuItem<tauri::Wry>> = workspaces.iter().take(5).map(|ws| {
+        // Build workspace items (up to 10, already sorted by last_accessed desc)
+        let ws_items: Vec<MenuItem<tauri::Wry>> = workspaces.iter().take(10).map(|ws| {
+            let emoji = type_emoji(&ws.workspace_type);
+            let is_valid = is_remote_type(&ws.workspace_type)
+                || validity.get(&ws.path).copied().unwrap_or(true);
+            let label = if is_valid {
+                format!("{} {}", emoji, ws.name)
+            } else {
+                format!("{} ✗ {}", emoji, ws.name)
+            };
             let uri = convert_to_vscode_uri(&ws.path, &ws.workspace_type);
             let menu_id = format!("ws_open:{}", uri);
-            MenuItem::with_id(app, &menu_id, &ws.name, true, None::<&str>).unwrap()
+            MenuItem::with_id(app, &menu_id, &label, is_valid, None::<&str>).unwrap()
         }).collect();
 
         let sep1 = PredefinedMenuItem::separator(app).unwrap();
@@ -215,12 +242,12 @@ fn build_menu(app: &tauri::AppHandle, workspaces: &[TrayWorkspace], backend_heal
 }
 
 /// Update the tray menu with fresh workspace data and health status
-pub async fn update_tray_menu(app: &tauri::AppHandle, workspaces: &[TrayWorkspace], backend_healthy: bool) {
+pub async fn update_tray_menu(app: &tauri::AppHandle, workspaces: &[TrayWorkspace], backend_healthy: bool, validity: &HashMap<String, bool>) {
     let tray_state: tauri::State<'_, TrayState> = app.state();
     let tray_icon = tray_state.tray_icon.lock().await;
 
     if let Some(tray) = tray_icon.as_ref() {
-        let new_menu = build_menu(app, workspaces, backend_healthy);
+        let new_menu = build_menu(app, workspaces, backend_healthy, validity);
         if let Err(e) = tray.set_menu(Some(new_menu)) {
             log::error!("Failed to update tray menu: {}", e);
         } else {
@@ -259,13 +286,63 @@ pub async fn fetch_workspaces(port: u16) -> Vec<TrayWorkspace> {
     }
 }
 
+/// Validate workspace paths via the sidecar API.
+/// Returns a map of workspace id → valid (true/false).
+/// On any failure, returns an empty map (all workspaces treated as valid).
+pub async fn validate_workspace_paths(port: u16, workspaces: &[TrayWorkspace]) -> HashMap<String, bool> {
+    let url = format!("http://127.0.0.1:{}/api/validate-paths", port);
+
+    // Build the request body: { workspaces: [{id, path}, ...] }
+    let payload: Vec<serde_json::Value> = workspaces.iter().map(|ws| {
+        serde_json::json!({ "id": ws.id, "path": ws.path })
+    }).collect();
+    let body = serde_json::json!({ "workspaces": payload });
+
+    let client = reqwest::Client::new();
+    match client.post(&url).json(&body).send().await {
+        Ok(response) => {
+            if response.status().is_success() {
+                // Response: { results: { "ws-id": true/false, ... } }
+                #[derive(Deserialize)]
+                struct ValidateResponse {
+                    results: HashMap<String, bool>,
+                }
+                match response.json::<ValidateResponse>().await {
+                    Ok(parsed) => {
+                        // Convert id-keyed results to path-keyed for build_menu lookup
+                        let mut path_validity = HashMap::new();
+                        for ws in workspaces {
+                            if let Some(&valid) = parsed.results.get(&ws.id) {
+                                path_validity.insert(ws.path.clone(), valid);
+                            }
+                        }
+                        path_validity
+                    }
+                    Err(e) => {
+                        log::warn!("Failed to parse validate-paths response: {}", e);
+                        HashMap::new()
+                    }
+                }
+            } else {
+                log::warn!("validate-paths returned status {}", response.status());
+                HashMap::new()
+            }
+        }
+        Err(e) => {
+            log::warn!("Failed to call validate-paths: {}", e);
+            HashMap::new()
+        }
+    }
+}
+
 /// Refresh the tray menu by fetching current data
 pub async fn refresh_tray(app: &tauri::AppHandle, port: u16) {
     log::debug!("Tray refresh: fetching workspaces from port {}", port);
     let workspaces = fetch_workspaces(port).await;
     let healthy = super::check_sidecar_health(port).await;
-    log::debug!("Tray refresh: got {} workspaces, healthy={}", workspaces.len(), healthy);
-    update_tray_menu(app, &workspaces, healthy).await;
+    let validity = validate_workspace_paths(port, &workspaces).await;
+    log::debug!("Tray refresh: got {} workspaces, healthy={}, validated {} paths", workspaces.len(), healthy, validity.len());
+    update_tray_menu(app, &workspaces, healthy, &validity).await;
 }
 
 #[cfg(test)]
@@ -328,12 +405,13 @@ mod tests {
     #[test]
     fn tray_workspace_deserializes_from_api_json() {
         let json = r#"[
-            {"name": "my-project", "path": "/home/user/my-project", "type": "local", "lastAccessed": "2026-03-09T10:00:00Z"},
-            {"name": "other-project", "path": "/home/user/other", "type": "ssh-remote", "lastAccessed": "2026-03-08T10:00:00Z"}
+            {"id": "ws-1", "name": "my-project", "path": "/home/user/my-project", "type": "local", "lastAccessed": "2026-03-09T10:00:00Z"},
+            {"id": "ws-2", "name": "other-project", "path": "/home/user/other", "type": "ssh-remote", "lastAccessed": "2026-03-08T10:00:00Z"}
         ]"#;
 
         let workspaces: Vec<TrayWorkspace> = serde_json::from_str(json).unwrap();
         assert_eq!(workspaces.len(), 2);
+        assert_eq!(workspaces[0].id, "ws-1");
         assert_eq!(workspaces[0].name, "my-project");
         assert_eq!(workspaces[0].path, "/home/user/my-project");
         assert_eq!(workspaces[0].workspace_type, "local");
@@ -344,15 +422,16 @@ mod tests {
     #[test]
     fn tray_workspace_deserializes_with_extra_fields() {
         // The API returns more fields than TrayWorkspace needs — verify it ignores extras
-        let json = r#"{"name": "proj", "path": "/p", "lastAccessed": "2026-01-01T00:00:00Z", "type": "local", "id": "abc123"}"#;
+        let json = r#"{"id": "abc123", "name": "proj", "path": "/p", "lastAccessed": "2026-01-01T00:00:00Z", "type": "local", "size": 1024}"#;
         let ws: TrayWorkspace = serde_json::from_str(json).unwrap();
+        assert_eq!(ws.id, "abc123");
         assert_eq!(ws.name, "proj");
         assert_eq!(ws.workspace_type, "local");
     }
 
     #[test]
     fn tray_workspace_type_defaults_when_missing() {
-        let json = r#"{"name": "proj", "path": "/p", "lastAccessed": "2026-01-01T00:00:00Z"}"#;
+        let json = r#"{"id": "ws-1", "name": "proj", "path": "/p", "lastAccessed": "2026-01-01T00:00:00Z"}"#;
         let ws: TrayWorkspace = serde_json::from_str(json).unwrap();
         assert_eq!(ws.workspace_type, "");
     }
@@ -360,9 +439,9 @@ mod tests {
     #[test]
     fn workspaces_sort_by_last_accessed_descending() {
         let mut workspaces = vec![
-            TrayWorkspace { name: "old".into(), path: "/old".into(), workspace_type: "local".into(), last_accessed: "2026-01-01T00:00:00Z".into() },
-            TrayWorkspace { name: "newest".into(), path: "/new".into(), workspace_type: "local".into(), last_accessed: "2026-03-09T00:00:00Z".into() },
-            TrayWorkspace { name: "mid".into(), path: "/mid".into(), workspace_type: "local".into(), last_accessed: "2026-02-01T00:00:00Z".into() },
+            TrayWorkspace { id: "1".into(), name: "old".into(), path: "/old".into(), workspace_type: "local".into(), last_accessed: "2026-01-01T00:00:00Z".into() },
+            TrayWorkspace { id: "2".into(), name: "newest".into(), path: "/new".into(), workspace_type: "local".into(), last_accessed: "2026-03-09T00:00:00Z".into() },
+            TrayWorkspace { id: "3".into(), name: "mid".into(), path: "/mid".into(), workspace_type: "local".into(), last_accessed: "2026-02-01T00:00:00Z".into() },
         ];
 
         workspaces.sort_by(|a, b| b.last_accessed.cmp(&a.last_accessed));
@@ -373,17 +452,129 @@ mod tests {
     }
 
     #[test]
-    fn workspaces_limited_to_five() {
-        let workspaces: Vec<TrayWorkspace> = (0..10).map(|i| TrayWorkspace {
+    fn workspaces_limited_to_ten() {
+        let workspaces: Vec<TrayWorkspace> = (0..15).map(|i| TrayWorkspace {
+            id: format!("ws-{}", i),
             name: format!("project-{}", i),
             path: format!("/path/{}", i),
             workspace_type: "local".into(),
             last_accessed: format!("2026-03-{:02}T00:00:00Z", i + 1),
         }).collect();
 
-        let shown: Vec<_> = workspaces.iter().take(5).collect();
-        assert_eq!(shown.len(), 5);
-        assert_eq!(workspaces.len(), 10);
+        let shown: Vec<_> = workspaces.iter().take(10).collect();
+        assert_eq!(shown.len(), 10);
+        assert_eq!(workspaces.len(), 15);
+    }
+
+    // --- Type emoji tests ---
+
+    #[test]
+    fn type_emoji_maps_all_known_types() {
+        assert_eq!(type_emoji("local"), "🔵");
+        assert_eq!(type_emoji("ssh-remote"), "🟣");
+        assert_eq!(type_emoji("dev-container"), "🟢");
+        assert_eq!(type_emoji("attached-container"), "🟡");
+        assert_eq!(type_emoji("remote"), "🩷");
+    }
+
+    #[test]
+    fn type_emoji_unknown_and_empty_fallback() {
+        assert_eq!(type_emoji(""), "⚪");
+        assert_eq!(type_emoji("something-new"), "⚪");
+    }
+
+    // --- Remote type detection tests ---
+
+    #[test]
+    fn is_remote_type_identifies_remote_types() {
+        assert!(is_remote_type("ssh-remote"));
+        assert!(is_remote_type("dev-container"));
+        assert!(is_remote_type("attached-container"));
+        assert!(is_remote_type("remote"));
+    }
+
+    #[test]
+    fn is_remote_type_rejects_local_and_unknown() {
+        assert!(!is_remote_type("local"));
+        assert!(!is_remote_type(""));
+        assert!(!is_remote_type("unknown"));
+    }
+
+    // --- Label formatting tests ---
+
+    #[test]
+    fn workspace_label_valid_local() {
+        let emoji = type_emoji("local");
+        let is_valid = true;
+        let name = "my-project";
+        let label = if is_valid {
+            format!("{} {}", emoji, name)
+        } else {
+            format!("{} ✗ {}", emoji, name)
+        };
+        assert_eq!(label, "🔵 my-project");
+    }
+
+    #[test]
+    fn workspace_label_invalid_local() {
+        let emoji = type_emoji("local");
+        let is_valid = false;
+        let name = "deleted-project";
+        let label = if is_valid {
+            format!("{} {}", emoji, name)
+        } else {
+            format!("{} ✗ {}", emoji, name)
+        };
+        assert_eq!(label, "🔵 ✗ deleted-project");
+    }
+
+    #[test]
+    fn workspace_label_remote_always_valid_even_if_validation_says_false() {
+        // Remote workspaces should never show as invalid
+        let ws_type = "ssh-remote";
+        let validation_says_invalid = false;
+        let is_valid = is_remote_type(ws_type) || validation_says_invalid;
+        assert!(is_valid, "Remote workspaces must always be treated as valid");
+    }
+
+    #[test]
+    fn workspace_label_valid_when_no_validity_data() {
+        // When validity map is empty (API failure fallback), workspaces default to valid
+        let validity: HashMap<String, bool> = HashMap::new();
+        let is_valid = validity.get("/some/path").copied().unwrap_or(true);
+        assert!(is_valid, "Missing validity data should default to valid");
+    }
+
+    // --- Validate-paths response parsing test ---
+
+    #[test]
+    fn validate_response_parsing() {
+        // Simulate the JSON response from /api/validate-paths
+        let response_json = r#"{"results": {"ws-1": true, "ws-2": false, "ws-3": true}}"#;
+
+        #[derive(Deserialize)]
+        struct ValidateResponse {
+            results: HashMap<String, bool>,
+        }
+        let parsed: ValidateResponse = serde_json::from_str(response_json).unwrap();
+
+        // Convert id-keyed results to path-keyed
+        let workspaces = vec![
+            TrayWorkspace { id: "ws-1".into(), name: "proj1".into(), path: "/path/1".into(), workspace_type: "local".into(), last_accessed: "".into() },
+            TrayWorkspace { id: "ws-2".into(), name: "proj2".into(), path: "/path/2".into(), workspace_type: "local".into(), last_accessed: "".into() },
+            TrayWorkspace { id: "ws-3".into(), name: "proj3".into(), path: "/path/3".into(), workspace_type: "ssh-remote".into(), last_accessed: "".into() },
+        ];
+
+        let mut path_validity = HashMap::new();
+        for ws in &workspaces {
+            if let Some(&valid) = parsed.results.get(&ws.id) {
+                path_validity.insert(ws.path.clone(), valid);
+            }
+        }
+
+        assert_eq!(path_validity.get("/path/1"), Some(&true));
+        assert_eq!(path_validity.get("/path/2"), Some(&false));
+        assert_eq!(path_validity.get("/path/3"), Some(&true));
     }
 
     // --- URI conversion tests (verifies the bug fix) ---
