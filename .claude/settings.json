@@ -6,7 +6,8 @@
       "Bash(cargo *)",
       "Bash(curl -s http://127.0.0.1:3010/*)",
       "Bash(pip3 show:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git fetch:*)"
     ]
   }
 }
