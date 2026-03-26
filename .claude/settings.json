@@ -1,20 +1,12 @@
 {
   "permissions": {
     "allow": [
-      "Bash(DASHBOARD_PORT=3099 HOST=127.0.0.1 timeout 5 \"/Applications/VS Code Workspace Dashboard.app/Contents/MacOS/sidecar-vscode-dashboard\")",
-      "Bash(echo \"EXIT: $?\")",
-      "Bash(open \"/Users/user/Docs/projects/SIDE_PROJECTS/vs_code_workspace_dashboard/src-tauri/target/release/bundle/macos/VS Code Workspace Dashboard.app\")",
-      "Bash(curl -s http://127.0.0.1:3010/health)",
-      "Bash(curl -s http://127.0.0.1:3010/api/workspaces)",
-      "Bash(sips -g pixelWidth -g pixelHeight /Users/user/Docs/projects/SIDE_PROJECTS/vs_code_workspace_dashboard/app-icons.png)",
-      "Bash(convert app-icons.png -crop 1408x1536+1408+0 +repage /tmp/dark-half.png)",
-      "Bash(sips -g pixelWidth -g pixelHeight /tmp/dark-half.png)",
-      "Read(//tmp/**)",
-      "Read(//private/tmp/**)",
-      "Bash(magick /tmp/dark-half.png -trim +repage /tmp/dark-trimmed.png)",
-      "Bash(sips -g pixelWidth -g pixelHeight /tmp/dark-trimmed.png)",
-      "Bash(git -C /Users/user/Docs/projects/SIDE_PROJECTS/vs_code_workspace_dashboard log --oneline --all -- public/index.html build/index.html)",
-      "Bash(git -C /Users/user/Docs/projects/SIDE_PROJECTS/vs_code_workspace_dashboard show HEAD:public/index.html)"
+      "Bash(npm *)",
+      "Bash(npx *)",
+      "Bash(cargo *)",
+      "Bash(curl -s http://127.0.0.1:3010/*)",
+      "Bash(pip3 show:*)",
+      "Bash(git add:*)"
     ]
   }
 }

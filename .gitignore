@@ -29,5 +29,11 @@ yarn-error.log*
 .env.test.local
 .env.production.local
 
+# Compiled sidecar binaries (built by CI/CD)
+src-tauri/binaries/sidecar-vscode-dashboard*
+
+# Claude Code local settings
+.claude/settings.local.json
+
 # Misc
 .cache/
