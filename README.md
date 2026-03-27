@@ -22,6 +22,10 @@ View, search, and open all your VS Code workspaces from one place. A cross-platf
 
 ## Quick Start
 
+### Dev Container (Recommended)
+
+Open in [GitHub Codespaces](https://github.com/codespaces) or any editor with [Dev Containers](https://containers.dev/) support. Everything is pre-configured — just run `npm run dev`.
+
 ### Local
 
 ```bash
