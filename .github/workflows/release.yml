@@ -11,58 +11,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # Build sidecar binaries first
-  build-sidecar:
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        target:
-          - node18-macos-x64
-          - node18-macos-arm64
-          - node18-linux-x64
-          - node18-win-x64
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 18
-          cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Install pkg
-        run: npm install -g pkg
-
-      - name: Build sidecar binary
-        run: |
-          pkg server/index.js --config pkg.config.json --targets ${{ matrix.target }} --output src-tauri/binaries/sidecar-vscode-dashboard
-
-      - name: Rename binary with platform suffix
-        run: |
-          cd src-tauri/binaries
-          if [ "${{ matrix.target }}" = "node18-macos-x64" ]; then
-            mv sidecar-vscode-dashboard sidecar-vscode-dashboard-x86_64-apple-darwin
-          elif [ "${{ matrix.target }}" = "node18-macos-arm64" ]; then
-            mv sidecar-vscode-dashboard sidecar-vscode-dashboard-aarch64-apple-darwin
-          elif [ "${{ matrix.target }}" = "node18-linux-x64" ]; then
-            mv sidecar-vscode-dashboard sidecar-vscode-dashboard-x86_64-unknown-linux-gnu
-          elif [ "${{ matrix.target }}" = "node18-win-x64" ]; then
-            mv sidecar-vscode-dashboard sidecar-vscode-dashboard-x86_64-pc-windows-msvc.exe
-          fi
-
-      - name: Upload sidecar artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: sidecar-${{ matrix.target }}
-          path: src-tauri/binaries/sidecar-vscode-dashboard*
-
-  # Build Tauri application
-  build-tauri:
-    needs: build-sidecar
+  # Build full application (React frontend + sidecar + Tauri desktop app) per platform
+  build:
     permissions:
       contents: write
     strategy:
@@ -71,16 +21,20 @@ jobs:
         include:
           - platform: 'macos-latest'
             args: '--target aarch64-apple-darwin'
-            sidecar: 'node18-macos-arm64'
+            pkg-target: 'node18-macos-arm64'
+            triple: 'aarch64-apple-darwin'
           - platform: 'macos-latest'
             args: '--target x86_64-apple-darwin'
-            sidecar: 'node18-macos-x64'
+            pkg-target: 'node18-macos-x64'
+            triple: 'x86_64-apple-darwin'
           - platform: 'ubuntu-22.04'
             args: ''
-            sidecar: 'node18-linux-x64'
+            pkg-target: 'node18-linux-x64'
+            triple: 'x86_64-unknown-linux-gnu'
           - platform: 'windows-latest'
             args: ''
-            sidecar: 'node18-win-x64'
+            pkg-target: 'node18-win-x64'
+            triple: 'x86_64-pc-windows-msvc'
 
     runs-on: ${{ matrix.platform }}
     steps:
@@ -107,37 +61,24 @@ jobs:
       - name: Install Node.js dependencies
         run: npm ci
 
-      - name: Download sidecar artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: sidecar-${{ matrix.sidecar }}
-          path: src-tauri/binaries/
+      - name: Build React frontend
+        run: npm run build
+
+      - name: Build sidecar binary
+        shell: bash
+        run: |
+          EXTENSION=""
+          if [ "${{ matrix.platform }}" = "windows-latest" ]; then
+            EXTENSION=".exe"
+          fi
+          npx pkg server/index.js \
+            --config pkg.config.json \
+            --targets "${{ matrix.pkg-target }}" \
+            --output "src-tauri/binaries/sidecar-vscode-dashboard-${{ matrix.triple }}${EXTENSION}"
 
       - name: Make sidecar executable (Unix)
         if: matrix.platform != 'windows-latest'
         run: chmod +x src-tauri/binaries/sidecar-vscode-dashboard*
-
-      - name: Build sidecar binary name
-        id: sidecar-name
-        shell: bash
-        run: |
-          if [[ "${{ matrix.platform }}" == "macos-latest" ]]; then
-            if [[ "${{ matrix.args }}" == *"aarch64"* ]]; then
-              echo "name=sidecar-vscode-dashboard-aarch64-apple-darwin" >> $GITHUB_OUTPUT
-            else
-              echo "name=sidecar-vscode-dashboard-x86_64-apple-darwin" >> $GITHUB_OUTPUT
-            fi
-          elif [[ "${{ matrix.platform }}" == "ubuntu-22.04" ]]; then
-            echo "name=sidecar-vscode-dashboard-x86_64-unknown-linux-gnu" >> $GITHUB_OUTPUT
-          else
-            echo "name=sidecar-vscode-dashboard-x86_64-pc-windows-msvc.exe" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Rename sidecar for Tauri
-        shell: bash
-        run: |
-          cd src-tauri/binaries
-          mv ${{ steps.sidecar-name.outputs.name }} sidecar-vscode-dashboard${{ matrix.platform == 'windows-latest' && '.exe' || '' }}
 
       - name: Build Tauri app
         uses: tauri-apps/tauri-action@v0
@@ -161,7 +102,7 @@ jobs:
 
   # Update release notes
   update-release:
-    needs: build-tauri
+    needs: build
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -175,17 +116,19 @@ jobs:
         id: release-notes
         run: |
           # Get the previous tag
-          PREV_TAG=$(git describe --tags --abbrev=0 ${{ github.ref_name }}^ 2>/dev/null || echo "")
-          
+          PREV_TAG=$(git describe --tags --abbrev=0 "$TAG_NAME"^ 2>/dev/null || echo "")
+
           if [ -n "$PREV_TAG" ]; then
             echo "Changes since $PREV_TAG:" > release_notes.md
             echo "" >> release_notes.md
-            git log --pretty=format:"- %s" $PREV_TAG..${{ github.ref_name }} >> release_notes.md
+            git log --pretty=format:"- %s" "$PREV_TAG".."$TAG_NAME" >> release_notes.md
           else
             echo "Initial release" > release_notes.md
           fi
-          
+
           cat release_notes.md
+        env:
+          TAG_NAME: ${{ github.ref_name }}
 
       - name: Update release
         uses: softprops/action-gh-release@v1
