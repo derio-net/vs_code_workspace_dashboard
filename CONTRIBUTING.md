@@ -102,6 +102,24 @@ openspec/
 
 For more details, see the workflow documentation in [CLAUDE.md](CLAUDE.md).
 
+## Dependency Management
+
+Dependencies are managed automatically by [Renovate](https://docs.renovatebot.com/). The configuration lives in [`renovate.json`](renovate.json).
+
+### How it works
+
+- **Weekly updates**: Renovate opens PRs for outdated npm and Cargo dependencies every Monday morning. Each PR runs the full CI pipeline (unit + E2E tests) before merge.
+- **3-day cool-off**: New package versions are held for 3 days before being proposed, protecting against supply chain attacks on freshly published versions.
+- **Vulnerability fast-track**: If a security advisory is published for a dependency we already use, Renovate creates a PR immediately (bypassing the cool-off) and automerges it when CI passes. These PRs are labeled `security` and prefixed with `[SECURITY]`.
+- **Automerge**: Patch and minor updates for dev dependencies are automerged after CI passes. Production dependencies and major updates always require manual review.
+- **Grouped updates**: Version-coupled packages (e.g., `@tauri-apps/*`, `@testing-library/*`, Tauri Cargo crates) are grouped into single PRs to avoid version mismatches.
+
+### What you need to do
+
+- Review and merge Renovate PRs that aren't automerged (production deps, major updates)
+- Pay attention to `[SECURITY]`-prefixed PRs — if CI fails on one, investigate promptly
+- Don't manually edit `renovate.json` without understanding the [Renovate docs](https://docs.renovatebot.com/configuration-options/)
+
 ## Submitting Changes
 
 1. Make your changes in a feature branch
