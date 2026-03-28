@@ -128,45 +128,52 @@ jobs:
             exit 0
           fi
 
-          # Rename all assets uploaded by this matrix job
-          # Query release assets directly rather than relying on artifactPaths
-          # (Tauri auto-generates .app.tar.gz files not listed in artifactPaths)
+          # Build extension-to-platform mapping for this job
+          EXTENSIONS=""
+          case "$PLATFORM" in
+            macos)   EXTENSIONS="dmg|app.tar.gz" ;;
+            linux)   EXTENSIONS="deb|AppImage|rpm" ;;
+            windows) EXTENSIONS="exe|msi" ;;
+          esac
+
+          # Query release assets and filter to this platform's file types
           ASSETS_JSON=$(gh api "repos/${{ github.repository }}/releases/$RELEASE_ID/assets")
+          ASSET_COUNT=$(echo "$ASSETS_JSON" | jq 'length')
+          echo "Found $ASSET_COUNT total release assets"
 
-          echo "$ASSETS_JSON" | jq -r '.[] | "\(.id)\t\(.name)"' | while IFS=$'\t' read -r ASSET_ID OLD_NAME; do
+          for i in $(seq 0 $((ASSET_COUNT - 1))); do
+            ASSET_ID=$(echo "$ASSETS_JSON" | jq -r ".[$i].id")
+            OLD_NAME=$(echo "$ASSETS_JSON" | jq -r ".[$i].name")
+
             # Skip assets already renamed by another matrix job
-            if [[ "$OLD_NAME" == *_macos_* ]] || [[ "$OLD_NAME" == *_linux_* ]] || [[ "$OLD_NAME" == *_windows_* ]]; then
-              continue
-            fi
+            case "$OLD_NAME" in *_macos_*|*_linux_*|*_windows_*) continue ;; esac
 
-            # Only rename assets that belong to this platform's build
-            DOMINATED=false
-            case "$PLATFORM" in
-              macos)  { [[ "$OLD_NAME" == *.dmg ]] || [[ "$OLD_NAME" == *.app.tar.gz ]]; } && DOMINATED=true ;;
-              linux)  { [[ "$OLD_NAME" == *.deb ]] || [[ "$OLD_NAME" == *.AppImage ]] || [[ "$OLD_NAME" == *.rpm ]]; } && DOMINATED=true ;;
-              windows) { [[ "$OLD_NAME" == *.exe ]] || [[ "$OLD_NAME" == *.msi ]]; } && DOMINATED=true ;;
-            esac
-            if [ "$DOMINATED" != "true" ]; then
-              continue
+            # Skip assets that don't match this platform's extensions
+            MATCH=false
+            if echo "$OLD_NAME" | grep -qE "\.(${EXTENSIONS})$"; then
+              MATCH=true
             fi
+            if [ "$MATCH" != "true" ]; then continue; fi
 
-            NEW_NAME=""
-            if [[ "$OLD_NAME" == VS.Code.Launchpad_* ]]; then
-              NEW_NAME="${OLD_NAME/VS.Code.Launchpad_/VS.Code.Launchpad_${PLATFORM}_}"
-            elif [[ "$OLD_NAME" == VS.Code.Launchpad-* ]]; then
-              NEW_NAME="${OLD_NAME/VS.Code.Launchpad-/VS.Code.Launchpad_${PLATFORM}_}"
+            # Insert platform label after product name
+            if echo "$OLD_NAME" | grep -q "^VS\.Code\.Launchpad_"; then
+              NEW_NAME=$(echo "$OLD_NAME" | sed "s/^VS\.Code\.Launchpad_/VS.Code.Launchpad_${PLATFORM}_/")
+            elif echo "$OLD_NAME" | grep -q "^VS\.Code\.Launchpad-"; then
+              NEW_NAME=$(echo "$OLD_NAME" | sed "s/^VS\.Code\.Launchpad-/VS.Code.Launchpad_${PLATFORM}_/")
             else
               continue
             fi
 
             # Add version to .app.tar.gz files that lack it
-            if [[ "$NEW_NAME" == *".app.tar.gz" ]] && [[ "$NEW_NAME" != *"$VERSION"* ]]; then
-              NEW_NAME="${NEW_NAME/.app.tar.gz/_${VERSION}.app.tar.gz}"
+            if echo "$NEW_NAME" | grep -q "\.app\.tar\.gz$"; then
+              if ! echo "$NEW_NAME" | grep -q "$VERSION"; then
+                NEW_NAME=$(echo "$NEW_NAME" | sed "s/\.app\.tar\.gz$/_${VERSION}.app.tar.gz/")
+              fi
             fi
 
             gh api "repos/${{ github.repository }}/releases/assets/$ASSET_ID" \
               -X PATCH -f name="$NEW_NAME" > /dev/null
-            echo "Renamed: $OLD_NAME → $NEW_NAME"
+            echo "Renamed: $OLD_NAME -> $NEW_NAME"
           done
 
   # Update release notes
