@@ -15,7 +15,7 @@ The system SHALL use GitHub Actions for automated cross-platform builds triggere
 
 #### Scenario: Multi-platform build matrix
 - **WHEN** the workflow runs
-- **THEN** it SHALL execute on: `macos-latest`, `ubuntu-latest`, and `windows-latest` runners
+- **THEN** it SHALL execute on: `macos-latest`, `ubuntu-22.04`, and `windows-latest` runners
 - **AND** each platform SHALL produce its native installer format
 
 #### Scenario: Workflow uses Tauri Action
@@ -42,27 +42,53 @@ The system SHALL generate platform-specific installer artifacts for each target 
 - **AND** the installers SHALL support Windows 10 and Windows 11
 
 #### Scenario: Artifact naming convention
-- **WHEN** artifacts are generated for version 1.0.0
-- **THEN** names SHALL follow the pattern: `vscode-dashboard_1.0.0_{platform}_{arch}.{ext}`
-- **AND** platform identifiers SHALL be: `darwin`, `linux`, `windows`
+
+- **WHEN** artifacts are generated
+- **THEN** names SHALL follow the pattern: `VS.Code.Launchpad_{platform}_{version}_{arch}.{ext}`
+- **AND** platform identifiers SHALL be: `macos`, `linux`, `windows`
+- **AND** `.app.tar.gz` bundles SHALL include the version even though Tauri omits it by default
+
+#### Scenario: Version synced from git tag
+
+- **WHEN** the workflow runs for a git tag
+- **THEN** `tauri.conf.json`'s `version` field SHALL be patched to match the tag (minus `v` prefix)
+- **AND** all generated artifacts SHALL embed the tag version in their filenames
+- **AND** the repo's `tauri.conf.json` SHALL NOT be modified (CI-only patch)
+
+#### Scenario: Concurrent rename safety
+
+- **WHEN** multiple matrix jobs complete and run the rename step concurrently
+- **THEN** each job SHALL only rename assets matching its platform's file extensions
+- **AND** assets already renamed by another job SHALL be skipped
+- **AND** no rename conflicts SHALL occur
 
 ### Requirement: Code signing configuration
 The system SHALL support code signing for macOS and Windows to prevent security warnings.
 
 #### Scenario: macOS code signing
+
 - **WHEN** the macOS build runs with signing secrets configured
 - **THEN** the `.app` bundle and `.dmg` SHALL be signed with the Apple Developer ID
 - **AND** the application SHALL be notarized for Gatekeeper compliance
 
+#### Scenario: macOS unsigned builds
+
+- **WHEN** the macOS build runs
+- **AND** `APPLE_CERTIFICATE` secret is not configured
+- **THEN** the `APPLE_*` environment variables SHALL be omitted from the build step
+- **AND** unsigned `.dmg` and `.app` bundles SHALL be produced
+
 #### Scenario: Windows code signing
+
 - **WHEN** the Windows build runs with signing secrets configured
 - **THEN** the `.msi` and `.exe` SHALL be signed with the Windows certificate
 - **AND** SmartScreen warnings SHALL be minimized
 
-#### Scenario: Unsigned builds for development
-- **WHEN** signing secrets are not available (e.g., PR builds)
-- **THEN** the build SHALL complete without signing
-- **AND** a warning SHALL be logged that the artifacts are unsigned
+#### Scenario: Unsigned builds when secrets absent
+- **WHEN** signing secrets (`APPLE_CERTIFICATE`, `WINDOWS_CERTIFICATE`) are not configured in the repository
+- **THEN** the workflow SHALL NOT pass signing environment variables to `tauri-apps/tauri-action`
+- **AND** the build SHALL complete successfully producing unsigned artifacts
+- **AND** no signing-related errors SHALL occur
 
 ### Requirement: Required secrets configuration
 The system SHALL document all required secrets for the GitHub Actions workflow.
