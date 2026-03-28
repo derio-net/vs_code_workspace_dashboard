@@ -66,17 +66,16 @@ The system SHALL generate platform-specific installer artifacts for each target 
 The system SHALL support code signing for macOS and Windows to prevent security warnings.
 
 #### Scenario: macOS code signing
-
-- **WHEN** the macOS build runs with signing secrets configured
-- **THEN** the `.app` bundle and `.dmg` SHALL be signed with the Apple Developer ID
-- **AND** the application SHALL be notarized for Gatekeeper compliance
+- **WHEN** the macOS build runs with signing secrets configured (`APPLE_CERTIFICATE`, `APPLE_CERTIFICATE_PASSWORD`, `APPLE_SIGNING_IDENTITY`)
+- **THEN** the `.app` bundle and `.dmg` SHALL be signed with the Apple Development certificate
+- **AND** the signing identity SHALL be passed via the `APPLE_SIGNING_IDENTITY` environment variable
 
 #### Scenario: macOS unsigned builds
-
 - **WHEN** the macOS build runs
 - **AND** `APPLE_CERTIFICATE` secret is not configured
 - **THEN** the `APPLE_*` environment variables SHALL be omitted from the build step
 - **AND** unsigned `.dmg` and `.app` bundles SHALL be produced
+- **AND** a warning SHALL be logged indicating signing was skipped
 
 #### Scenario: Windows code signing
 
@@ -94,8 +93,9 @@ The system SHALL support code signing for macOS and Windows to prevent security 
 The system SHALL document all required secrets for the GitHub Actions workflow.
 
 #### Scenario: macOS signing secrets
-- **WHEN** configuring the repository secrets
-- **THEN** the following SHALL be set: `APPLE_CERTIFICATE`, `APPLE_CERTIFICATE_PASSWORD`, `APPLE_SIGNING_IDENTITY`, `APPLE_ID`, `APPLE_PASSWORD`, `APPLE_TEAM_ID`
+- **WHEN** configuring the repository secrets for macOS code signing
+- **THEN** the following SHALL be set: `APPLE_CERTIFICATE` (base64-encoded .p12), `APPLE_CERTIFICATE_PASSWORD` (p12 export password), `APPLE_SIGNING_IDENTITY` (certificate common name)
+- **AND** for future notarization, additionally: `APPLE_ID`, `APPLE_PASSWORD`, `APPLE_TEAM_ID`
 
 #### Scenario: Windows signing secrets
 - **WHEN** configuring the repository secrets
