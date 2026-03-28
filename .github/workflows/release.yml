@@ -58,6 +58,14 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev libjavascriptcoregtk-4.1-dev libsoup-3.0-dev libappindicator3-dev librsvg2-dev patchelf
 
+      - name: Set version from git tag
+        shell: bash
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          echo "Setting version to $VERSION"
+          jq --arg v "$VERSION" '.version = $v' src-tauri/tauri.conf.json > tmp.json && mv tmp.json src-tauri/tauri.conf.json
+          cat src-tauri/tauri.conf.json | jq '.version'
+
       - name: Install Node.js dependencies
         run: npm ci
 
@@ -81,6 +89,7 @@ jobs:
         run: chmod +x src-tauri/binaries/sidecar-vscode-dashboard*
 
       - name: Build Tauri app
+        id: tauri-build
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -95,6 +104,57 @@ jobs:
           releaseDraft: true
           prerelease: ${{ contains(github.ref_name, 'beta') }}
           args: ${{ matrix.args }}
+
+      - name: Rename release assets with platform label
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PLATFORM=""
+          case "${{ matrix.platform }}" in
+            macos-latest) PLATFORM="macos" ;;
+            ubuntu-22.04) PLATFORM="linux" ;;
+            windows-latest) PLATFORM="windows" ;;
+          esac
+
+          VERSION="${GITHUB_REF_NAME#v}"
+          TAG="${{ github.ref_name }}"
+          RELEASE_ID=$(gh api "repos/${{ github.repository }}/releases/tags/$TAG" --jq '.id')
+
+          ARTIFACTS='${{ steps.tauri-build.outputs.artifactPaths }}'
+          for artifact_path in $(echo "$ARTIFACTS" | jq -r '.[]'); do
+            OLD_NAME=$(basename "$artifact_path")
+            NEW_NAME=""
+
+            # Insert platform label after product name
+            if [[ "$OLD_NAME" == VS.Code.Launchpad_* ]]; then
+              NEW_NAME="${OLD_NAME/VS.Code.Launchpad_/VS.Code.Launchpad_${PLATFORM}_}"
+            elif [[ "$OLD_NAME" == VS.Code.Launchpad-* ]]; then
+              # RPM uses dash separator
+              NEW_NAME="${OLD_NAME/VS.Code.Launchpad-/VS.Code.Launchpad_${PLATFORM}_}"
+            elif [[ "$OLD_NAME" == *VS.Code.Launchpad* ]]; then
+              NEW_NAME="${OLD_NAME/VS.Code.Launchpad/VS.Code.Launchpad_${PLATFORM}}"
+            else
+              continue
+            fi
+
+            # Add version to .app.tar.gz files that lack it
+            if [[ "$NEW_NAME" == *".app.tar.gz" ]] && [[ "$NEW_NAME" != *"$VERSION"* ]]; then
+              NEW_NAME="${NEW_NAME/.app.tar.gz/_${VERSION}.app.tar.gz}"
+            fi
+
+            ASSET_ID=$(gh api "repos/${{ github.repository }}/releases/$RELEASE_ID/assets" \
+              --jq ".[] | select(.name == \"$OLD_NAME\") | .id")
+
+            if [ -n "$ASSET_ID" ] && [ "$ASSET_ID" != "null" ]; then
+              gh api "repos/${{ github.repository }}/releases/assets/$ASSET_ID" \
+                -X PATCH -f name="$NEW_NAME" > /dev/null
+              echo "Renamed: $OLD_NAME → $NEW_NAME"
+            else
+              echo "Warning: asset not found for rename: $OLD_NAME"
+            fi
+          done
 
   # Update release notes
   update-release:
