@@ -142,9 +142,9 @@ jobs:
             # Only rename assets that belong to this platform's build
             DOMINATED=false
             case "$PLATFORM" in
-              macos)  [[ "$OLD_NAME" == *.dmg ]] || [[ "$OLD_NAME" == *.app.tar.gz ]] && DOMINATED=true ;;
-              linux)  [[ "$OLD_NAME" == *.deb ]] || [[ "$OLD_NAME" == *.AppImage ]] || [[ "$OLD_NAME" == *.rpm ]] && DOMINATED=true ;;
-              windows) [[ "$OLD_NAME" == *.exe ]] || [[ "$OLD_NAME" == *.msi ]] && DOMINATED=true ;;
+              macos)  { [[ "$OLD_NAME" == *.dmg ]] || [[ "$OLD_NAME" == *.app.tar.gz ]]; } && DOMINATED=true ;;
+              linux)  { [[ "$OLD_NAME" == *.deb ]] || [[ "$OLD_NAME" == *.AppImage ]] || [[ "$OLD_NAME" == *.rpm ]]; } && DOMINATED=true ;;
+              windows) { [[ "$OLD_NAME" == *.exe ]] || [[ "$OLD_NAME" == *.msi ]]; } && DOMINATED=true ;;
             esac
             if [ "$DOMINATED" != "true" ]; then
               continue
